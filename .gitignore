@@ -12,9 +12,10 @@ venv/
 !.env.example
 
 # Local database
-movies.db
+content.db
 
 # IDE / editor
+.idea/
 .idea/workspace.xml
 
 # OS files

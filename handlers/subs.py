@@ -242,7 +242,7 @@ async def process_extension(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
         return
 
-    await callback.message.answer("Subscription extended")
+    await callback.message.answer("Subscription extended", reply_markup=get_main_reply_subs())
     await state.set_state(AppState.subs_menu)
     await callback.answer()
 
@@ -299,7 +299,7 @@ async def process_custom_months(message: Message, state: FSMContext):
 
     await extend_subscription_date(subscription_id, months)
 
-    await message.answer("Subscription extended")
+    await message.answer("Subscription extended", reply_markup=get_main_reply_subs())
     await state.set_state(AppState.subs_menu)
 
 

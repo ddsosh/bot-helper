@@ -2,7 +2,7 @@ import aiosqlite
 import hashlib
 import os
 
-DB_NAME = "movies.db"
+DB_NAME = "content.db"
 
 
 async def init_db():
