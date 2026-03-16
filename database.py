@@ -11,6 +11,7 @@ DB_NAME = DB_DIR / "content.db"
 
 async def init_db():
     DB_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"DB_PATH={DB_NAME}")
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute("PRAGMA foreign_keys = ON")
         await db.execute("""
