@@ -142,30 +142,7 @@ async def list_note_handler(message: Message, state: FSMContext):
     if not user:
         await message.answer("error(list) /start")
         return
-
-    subs = await get_subscriptions(user[0])
-    if not subs:
-        await message.answer("list empty")
-        return
-
-    text = "Subs:\n"
-    sub_map = {}
-
-    for index, sub in enumerate(subs, start=1):
-        sub_id, user_id, title, price, end_date, reminded_5_days, reminded_1_day, comment = sub[:8]
-        comment_text = comment if comment else "No comment"
-        text += f"{index}. {title}, {price}, {end_date} - {comment_text}\n"
-        sub_map[index] = sub_id
-
-    await state.update_data(sub_map=sub_map)
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="extend", callback_data="extend_sub")],
-            [InlineKeyboardButton(text="delete", callback_data="delete_sub")],
-        ]
-    )
-    await message.answer(text, reply_markup=keyboard)
+    await render_subs_list(message, state, user[0])
 
 
 #EXTEND------------------------------------------------------------------------------------
@@ -178,7 +155,12 @@ async def extend_start(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(AppState.subs_menu, F.data == "delete_sub")
 async def delete_sub_start_callback(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.delete_subscription_number)
-    await callback.message.answer("Enter num", reply_markup=ReplyKeyboardRemove())
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="cancel delete", callback_data="cancel_delete_sub")]
+        ]
+    )
+    await callback.message.answer("Enter num", reply_markup=keyboard)
     await callback.answer()
 
 @router.message(AppState.extend_subscription_number)
@@ -354,9 +336,8 @@ async def delete_sub_by_number(message: Message, state: FSMContext):
         return
 
     await delete_subscription(user[0], sub_id)
-    await message.answer("OK Deleted")
-    await state.clear()
     await state.set_state(AppState.subs_menu)
+    await render_subs_list(message, state, user[0])
 
 #DEL SUB CB---------------------------------------------------------------------------------
 @router.callback_query(F.data.startswith("del_sub_"))
@@ -369,8 +350,54 @@ async def delete_callback(callback: CallbackQuery):
         return
 
     await delete_subscription(user[0], sub_id)
-    await callback.message.edit_text("Successful")
+    await render_subs_list(callback, state=None, user_id=user[0])
     await callback.answer()
+
+
+@router.callback_query(AppState.delete_subscription_number, F.data == "cancel_delete_sub")
+async def cancel_delete_sub(callback: CallbackQuery, state: FSMContext):
+    user = await get_current_user(callback)
+    if not user:
+        await callback.answer("error(user not found) /start")
+        return
+
+    await state.set_state(AppState.subs_menu)
+    await render_subs_list(callback, state, user[0])
+    await callback.answer()
+
+
+async def render_subs_list(event, state, user_id: int):
+    subs = await get_subscriptions(user_id)
+    if not subs:
+        if isinstance(event, CallbackQuery):
+            await event.message.edit_text("list empty")
+        else:
+            await event.answer("list empty")
+        return
+
+    text = "Subs:\n"
+    sub_map = {}
+
+    for index, sub in enumerate(subs, start=1):
+        sub_id, user_id, title, price, end_date, reminded_5_days, reminded_1_day, comment = sub[:8]
+        comment_text = comment if comment else "No comment"
+        text += f"{index}. {title}, {price}, {end_date} - {comment_text}\n"
+        sub_map[index] = sub_id
+
+    if state:
+        await state.update_data(sub_map=sub_map)
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="extend", callback_data="extend_sub")],
+            [InlineKeyboardButton(text="delete", callback_data="delete_sub")],
+        ]
+    )
+
+    if isinstance(event, CallbackQuery):
+        await event.message.edit_text(text, reply_markup=keyboard)
+    else:
+        await event.answer(text, reply_markup=keyboard)
 
 
 #BACK--------------------------------------------------------------------------------------

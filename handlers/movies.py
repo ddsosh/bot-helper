@@ -87,34 +87,19 @@ async def list_movies_handler(message: Message, state: FSMContext):
     if not user:
         await message.answer("error(list) /start")
         return
-
-    movies = await get_movies(user[0])
-    if not movies:
-        await message.answer("list empty")
-        return
-
-    text = "Movies list:\n\n"
-    movie_map = {}
-
-    for index, movie in enumerate(movies, start=1):
-        movie_id, user_id, title, type_, comment, created_at = movie
-        text += f"{index}. {title} ({type_}) - {comment}\n"
-        movie_map[index] = movie_id
-
-    await state.update_data(movie_map=movie_map)
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="delete", callback_data="delete_movie")]
-        ]
-    )
-    await message.answer(text, reply_markup=keyboard)
+    await render_movies_list(message, state, user[0])
 
 
 #DELETE MOVIE------------------------------------------------------------------------------------
 @router.callback_query(AppState.movies_menu, F.data == "delete_movie")
 async def delete_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.delete_movie_number)
-    await callback.message.answer("Enter number to delete:", reply_markup=ReplyKeyboardRemove())
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="cancel delete", callback_data="cancel_delete_movie")]
+        ]
+    )
+    await callback.message.answer("Enter number to delete:", reply_markup=keyboard)
     await callback.answer()
 
 
@@ -146,8 +131,8 @@ async def delete_by_number(message: Message, state: FSMContext):
         return
 
     await delete_movie(user[0], movie_id)
-    await message.answer("OK Deleted")
     await state.set_state(AppState.movies_menu)
+    await render_movies_list(message, state, user[0])
 
 
 #BACK--------------------------------------------------------------------------------------
@@ -167,5 +152,49 @@ async def delete_callback(callback: CallbackQuery):
         return
 
     await delete_movie(user[0], movie_id)
-    await callback.message.edit_text("Successful")
+    await render_movies_list(callback, state=None, user_id=user[0])
     await callback.answer()
+
+
+@router.callback_query(AppState.delete_movie_number, F.data == "cancel_delete_movie")
+async def cancel_delete_movie(callback: CallbackQuery, state: FSMContext):
+    user = await get_current_user(callback)
+    if not user:
+        await callback.answer("error(user not found) /start")
+        return
+
+    await state.set_state(AppState.movies_menu)
+    await render_movies_list(callback, state, user[0])
+    await callback.answer()
+
+
+async def render_movies_list(event, state, user_id: int):
+    movies = await get_movies(user_id)
+    if not movies:
+        if isinstance(event, CallbackQuery):
+            await event.message.edit_text("list empty")
+        else:
+            await event.answer("list empty")
+        return
+
+    text = "Movies list:\n\n"
+    movie_map = {}
+
+    for index, movie in enumerate(movies, start=1):
+        movie_id, user_id, title, type_, comment, created_at = movie
+        text += f"{index}. {title} ({type_}) - {comment}\n"
+        movie_map[index] = movie_id
+
+    if state:
+        await state.update_data(movie_map=movie_map)
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="delete", callback_data="delete_movie")]
+        ]
+    )
+
+    if isinstance(event, CallbackQuery):
+        await event.message.edit_text(text, reply_markup=keyboard)
+    else:
+        await event.answer(text, reply_markup=keyboard)

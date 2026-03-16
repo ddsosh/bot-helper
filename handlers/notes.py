@@ -80,35 +80,19 @@ async def list_note_handler(message: Message, state: FSMContext):
     if not user:
         await message.answer("error(list) /start")
         return
-
-    notes = await get_notes(user[0])
-    if not notes:
-        await message.answer("list empty")
-        return
-
-    text = "Notes:\n"
-    note_map = {}
-
-    for index, note in enumerate(notes, start=1):
-        note_id, user_id, title, due_date, created_at = note
-        date_text = due_date if due_date else "No date"
-        text += f"{index}. {title} - {date_text}\n"
-        note_map[index] = note_id
-
-    await state.update_data(note_map=note_map)
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="delete", callback_data="delete_note")]
-        ]
-    )
-    await message.answer(text, reply_markup=keyboard)
+    await render_notes_list(message, state, user[0])
 
 
 #DELETE NOTE------------------------------------------------------------------------------------
 @router.callback_query(AppState.notes_menu, F.data == "delete_note")
 async def delete_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.delete_note_number)
-    await callback.message.answer("Enter number to delete:", reply_markup=ReplyKeyboardRemove())
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="cancel delete", callback_data="cancel_delete_note")]
+        ]
+    )
+    await callback.message.answer("Enter number to delete:", reply_markup=keyboard)
     await callback.answer()
 
 
@@ -140,8 +124,8 @@ async def delete_by_number(message: Message, state: FSMContext):
         return
 
     await delete_note(user[0], note_id)
-    await message.answer("OK Deleted")
     await state.set_state(AppState.notes_menu)
+    await render_notes_list(message, state, user[0])
 
 
 #DEL NOTE CB---------------------------------------------------------------------------------
@@ -154,8 +138,53 @@ async def delete_callback(callback: CallbackQuery):
         return
 
     await delete_note(user[0], note_id)
-    await callback.message.edit_text("Successful")
+    await render_notes_list(callback, state=None, user_id=user[0])
     await callback.answer()
+
+
+@router.callback_query(AppState.delete_note_number, F.data == "cancel_delete_note")
+async def cancel_delete_note(callback: CallbackQuery, state: FSMContext):
+    user = await get_current_user(callback)
+    if not user:
+        await callback.answer("error(user not found) /start")
+        return
+
+    await state.set_state(AppState.notes_menu)
+    await render_notes_list(callback, state, user[0])
+    await callback.answer()
+
+
+async def render_notes_list(event, state, user_id: int):
+    notes = await get_notes(user_id)
+    if not notes:
+        if isinstance(event, CallbackQuery):
+            await event.message.edit_text("list empty")
+        else:
+            await event.answer("list empty")
+        return
+
+    text = "Notes:\n"
+    note_map = {}
+
+    for index, note in enumerate(notes, start=1):
+        note_id, user_id, title, due_date, created_at = note
+        date_text = due_date if due_date else "No date"
+        text += f"{index}. {title} - {date_text}\n"
+        note_map[index] = note_id
+
+    if state:
+        await state.update_data(note_map=note_map)
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="delete", callback_data="delete_note")]
+        ]
+    )
+
+    if isinstance(event, CallbackQuery):
+        await event.message.edit_text(text, reply_markup=keyboard)
+    else:
+        await event.answer(text, reply_markup=keyboard)
 
 
 #SKIP--------------------------------------------------------------------------------------
