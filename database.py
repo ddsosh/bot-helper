@@ -1,13 +1,16 @@
 import hashlib
 import hmac
 import os
+from pathlib import Path
 
 import aiosqlite
 
-DB_NAME = os.path.join("data", "content.db")
+DB_DIR = Path("/data")
+DB_NAME = DB_DIR / "content.db"
 
 
 async def init_db():
+    DB_DIR.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute("PRAGMA foreign_keys = ON")
         await db.execute("""
