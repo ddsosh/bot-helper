@@ -46,7 +46,8 @@ def get_main_reply_subs():
         keyboard=[
             [KeyboardButton(text="add sub"), KeyboardButton(text="list subs")],
             [KeyboardButton(text="del sub"), KeyboardButton(text="back")],
-        ]
+        ],
+        resize_keyboard=True
     )
     return keyboard
 
@@ -54,7 +55,8 @@ def get_main_reply_cabinet():
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="mail"), KeyboardButton(text="back")],
-        ]
+        ],
+        resize_keyboard=True
     )
     return keyboard
 
@@ -62,7 +64,8 @@ def get_main_reply_mail():
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="mail"), KeyboardButton(text="back")],
-        ]
+        ],
+        resize_keyboard=True
     )
     return keyboard
 

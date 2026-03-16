@@ -3,10 +3,6 @@ from aiogram.fsm.state import StatesGroup, State
 
 #STATES------------------------------------------------------------------------------------
 class AppState(StatesGroup):
-    login = State()
-    pas = State()
-    verify_password = State()
-
     main = State()
 
     movies_menu = State()

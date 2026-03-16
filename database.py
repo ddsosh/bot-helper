@@ -1,6 +1,3 @@
-import hashlib
-import hmac
-import os
 from pathlib import Path
 
 import aiosqlite
@@ -16,9 +13,7 @@ async def init_db():
         await db.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            telegram_id INTEGER UNIQUE,
-            login TEXT NOT NULL,
-            password TEXT NOT NULL
+            telegram_id INTEGER UNIQUE NOT NULL
             )
         """)
         await db.execute("""
@@ -81,14 +76,13 @@ async def init_db():
  
 #USER------------------------------------------------------------------------------------
 
-async def add_user(telegram_id, login, password):
-    password_hash = _hash_password(password)
+async def add_user(telegram_id):
     async with aiosqlite.connect(DB_NAME) as db:
         try:
             await db.execute("""
-                INSERT INTO users (telegram_id, login, password)
-                VALUES (?, ?, ?)
-            """, (telegram_id, login, password_hash))
+                INSERT INTO users (telegram_id)
+                VALUES (?)
+            """, (telegram_id,))
             await db.commit()
             return True
         except aiosqlite.IntegrityError:
@@ -102,6 +96,16 @@ async def get_user_by_telegram_id(telegram_id):
                 """, (telegram_id,))
         return await cursor.fetchone()
 
+async def ensure_user(telegram_id):
+    user = await get_user_by_telegram_id(telegram_id)
+    if user:
+        return user
+
+    created = await add_user(telegram_id)
+    if not created:
+        return await get_user_by_telegram_id(telegram_id)
+    return await get_user_by_telegram_id(telegram_id)
+
 
 async def get_user_by_id(user_id):
     async with aiosqlite.connect(DB_NAME) as db:
@@ -109,40 +113,6 @@ async def get_user_by_id(user_id):
                     SELECT * FROM users WHERE id = ?
                 """, (user_id,))
         return await cursor.fetchone()
-
-
-def _hash_password(password: str) -> str:
-    salt = os.urandom(16)
-    iterations = 100_000
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
-    return f"pbkdf2_sha256${iterations}${salt.hex()}${digest.hex()}"
-
-
-def _verify_password(stored_hash: str, password: str) -> bool:
-    try:
-        algo, iterations_str, salt_hex, digest_hex = stored_hash.split("$", 3)
-    except ValueError:
-        return False
-    if algo != "pbkdf2_sha256":
-        return False
-    try:
-        iterations = int(iterations_str)
-        salt = bytes.fromhex(salt_hex)
-    except ValueError:
-        return False
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
-    return hmac.compare_digest(digest.hex(), digest_hex)
-
-
-async def verify_user_password(telegram_id, password):
-    async with aiosqlite.connect(DB_NAME) as db:
-        cursor = await db.execute("""
-                    SELECT password FROM users WHERE telegram_id = ?
-                """, (telegram_id,))
-        row = await cursor.fetchone()
-        if not row:
-            return False
-        return _verify_password(row[0], password)
 
 
 #MOVIE------------------------------------------------------------------------------------
