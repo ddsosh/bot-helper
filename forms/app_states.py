@@ -1,15 +1,18 @@
 from aiogram.fsm.state import StatesGroup, State
 
 
+#STATES------------------------------------------------------------------------------------
 class AppState(StatesGroup):
     login = State()
     pas = State()
+    verify_password = State()
 
     main = State()
 
     movies_menu = State()
     notes_menu = State()
     subs_menu = State()
+    cabinet_menu = State()
 
     add_movie_title = State()
     add_movie_type = State()
@@ -24,8 +27,19 @@ class AppState(StatesGroup):
     add_subscription_price = State()
     add_subscription_end_date = State()
     add_subscription_comment = State()
+    delete_subscription_number = State()
+
     extend_subscription_number = State()
     extend_subscription_period = State()
     extend_custom_months = State()
-    delete_subscription_number = State()
+
+    mail_list = State()
+    add_mail = State()
+    delete_mail = State()
+    delete_service = State()
+
+    service_list = State()
+    add_service_name = State()
+    add_service_login = State()
+    add_service_comment = State()
 

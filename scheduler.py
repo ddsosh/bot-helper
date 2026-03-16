@@ -1,6 +1,7 @@
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime
-from database import get_all_subscriptions, mark_reminded_5, mark_reminded_1
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from database import get_all_subscriptions, mark_reminded_5, mark_reminded_1, get_user_by_id
 
 scheduler = AsyncIOScheduler()
 
@@ -29,6 +30,10 @@ async def check_subscriptions(bot):
             comment,
         ) = sub[:8]
 
+        user = await get_user_by_id(user_id)
+        if not user:
+            continue
+
         end = datetime.strptime(end_date, '%Y-%m-%d').date()
         days_left = (end - today).days
 
@@ -37,7 +42,7 @@ async def check_subscriptions(bot):
 
         if days_left == 5 and not reminded_5_days:
             await bot.send_message(
-                chat_id=user_id,
+                chat_id=user[1],
                 text=f"Reminder: {title} ends in 5 days."
             )
 
@@ -45,15 +50,9 @@ async def check_subscriptions(bot):
 
         if days_left == 1 and not reminded_1_day:
             await bot.send_message(
-                chat_id=user_id,
+                chat_id=user[1],
                 text=f"[!] {title} ends tomorrow!"
             )
 
             await mark_reminded_1(sub_id)
 
-
-
-# async def scheduler_loop(bot):
-#     while True:
-#         await check_subscriptions(bot)
-#         await asyncio.sleep(86400)

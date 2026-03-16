@@ -2,12 +2,16 @@
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 
-from keyboards.menu import get_main_reply_movies, get_current_user, get_main_reply_menu
-from database import get_movies, delete_movie, add_movie, get_user_by_telegram_id
+
+from keyboards.menu import get_main_reply_movies, get_main_reply_menu
+from handlers.auth import get_current_user
+from database import get_movies, delete_movie, add_movie
 from forms.app_states import AppState
 
 
 router = Router()
+
+# MENU--------------------------------------------------------------------------------------
 
 
 @router.message(AppState.main, F.text.lower() == "movies")
@@ -22,6 +26,7 @@ async def add_movie_start(message: Message, state: FSMContext):
     await message.answer("Enter name", reply_markup=ReplyKeyboardRemove())
 
 
+#ADD MOVIE---------------------------------------------------------------------------------------
 @router.message(AppState.add_movie_title)
 async def movie_title(message: Message, state: FSMContext):
     title = (message.text or "").strip()
@@ -54,6 +59,7 @@ async def movie_comment(message: Message, state: FSMContext):
     data = await state.get_data()
     title = data["title"]
     type_ = data["type_"]
+
     comment = (message.text or "").strip()
 
     if len(comment) > 500:
@@ -74,6 +80,7 @@ async def movie_comment(message: Message, state: FSMContext):
     await message.answer("Movies section", reply_markup=get_main_reply_movies())
 
 
+#LIST MOVIE--------------------------------------------------------------------------------------
 @router.message(AppState.movies_menu, F.text.lower() == "list movies")
 async def list_movies_handler(message: Message, state: FSMContext):
     user = await get_current_user(message)
@@ -98,6 +105,7 @@ async def list_movies_handler(message: Message, state: FSMContext):
     await message.answer(text)
 
 
+#DELETE MOVIE------------------------------------------------------------------------------------
 @router.message(AppState.movies_menu, F.text.lower() == "del movie")
 async def delete_start(message: Message, state: FSMContext):
     await state.set_state(AppState.delete_movie_number)
@@ -136,16 +144,18 @@ async def delete_by_number(message: Message, state: FSMContext):
     await state.set_state(AppState.movies_menu)
 
 
+#BACK--------------------------------------------------------------------------------------
 @router.message(AppState.movies_menu, F.text.lower() == "back")
 async def back_handler(message: Message, state: FSMContext):
     await state.set_state(AppState.main)
     await message.answer("Main menu", reply_markup=get_main_reply_menu())
 
 
+#DEL MOVIE CB---------------------------------------------------------------------------------
 @router.callback_query(F.data.startswith("del_movie_"))
 async def delete_callback(callback: CallbackQuery):
     movie_id = int(callback.data.split("_")[2])
-    user = await get_user_by_telegram_id(callback.from_user.id)
+    user = await get_current_user(callback)
     if not user:
         await callback.answer("error(user not found) /start")
         return

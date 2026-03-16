@@ -1,20 +1,19 @@
 from aiogram import Router
 from aiogram.types import (
-    Message,
     ReplyKeyboardMarkup,
     KeyboardButton,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
-from database import get_user_by_telegram_id
-
 router = Router()
 
+#REPLY MENUS-------------------------------------------------------------------------------
 
 def get_main_reply_menu():
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="movies"), KeyboardButton(text="notes"), KeyboardButton(text="subs")],
+            [KeyboardButton(text="movies"), KeyboardButton(text="notes")],
+             [KeyboardButton(text="subs"), KeyboardButton(text="cabinet")],
         ],
         resize_keyboard=True
     )
@@ -50,7 +49,24 @@ def get_main_reply_subs():
         ]
     )
     return keyboard
-#-------------------------------------------------------------------------------
+
+def get_main_reply_cabinet():
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="mail"), KeyboardButton(text="back")],
+        ]
+    )
+    return keyboard
+
+def get_main_reply_mail():
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="mail"), KeyboardButton(text="back")],
+        ]
+    )
+    return keyboard
+
+#INLINE MENUS-------------------------------------------------------------------------------
 
 def get_main_inline_menu():
     keyboard = InlineKeyboardMarkup(
@@ -61,10 +77,5 @@ def get_main_inline_menu():
         ]
     )
     return keyboard
-
-#-------------------------------------------------------------------------------
-
-async def get_current_user(event):
-    return await get_user_by_telegram_id(event.from_user.id)
 
 

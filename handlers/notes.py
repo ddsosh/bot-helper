@@ -2,20 +2,22 @@
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 
-from keyboards.menu import get_main_reply_notes, get_main_reply_menu, get_current_user
-from database import get_user_by_telegram_id, delete_note, get_notes, add_note
+from database import delete_note, get_notes, add_note
 from forms.app_states import AppState
+from handlers.auth import get_current_user
+from keyboards.menu import get_main_reply_notes, get_main_reply_menu
 
 
 router = Router()
 
+#MENU--------------------------------------------------------------------------------------
 
 @router.message(AppState.main, F.text.lower() == "notes")
 async def notes_menu(message: Message, state: FSMContext):
     await state.set_state(AppState.notes_menu)
     await message.answer("Notes section", reply_markup=get_main_reply_notes())
 
-
+#ADD NOTE---------------------------------------------------------------------------------------
 @router.message(AppState.notes_menu, F.text.lower() == "add note")
 async def add_note_start(message: Message, state: FSMContext):
     await state.set_state(AppState.add_note_title)
@@ -71,6 +73,7 @@ async def note_date(message: Message, state: FSMContext):
     await message.answer("Notes section", reply_markup=get_main_reply_notes())
 
 
+#LIST NOTES--------------------------------------------------------------------------------------
 @router.message(AppState.notes_menu, F.text.lower() == "list notes")
 async def list_note_handler(message: Message, state: FSMContext):
     user = await get_current_user(message)
@@ -96,6 +99,7 @@ async def list_note_handler(message: Message, state: FSMContext):
     await message.answer(text)
 
 
+#DELETE NOTE------------------------------------------------------------------------------------
 @router.message(AppState.notes_menu, F.text.lower() == "del note")
 async def delete_start(message: Message, state: FSMContext):
     await state.set_state(AppState.delete_note_number)
@@ -134,6 +138,7 @@ async def delete_by_number(message: Message, state: FSMContext):
     await state.set_state(AppState.notes_menu)
 
 
+#DEL NOTE CB---------------------------------------------------------------------------------
 @router.callback_query(F.data.startswith("del_note_"))
 async def delete_callback(callback: CallbackQuery):
     note_id = int(callback.data.split("_")[2])
@@ -147,6 +152,7 @@ async def delete_callback(callback: CallbackQuery):
     await callback.answer()
 
 
+#SKIP--------------------------------------------------------------------------------------
 @router.callback_query(AppState.add_note_date, F.data == "skip_note_date")
 async def skip_note_date(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -175,6 +181,7 @@ async def skip_note_date(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer("Notes section", reply_markup=get_main_reply_notes())
 
 
+#BACK--------------------------------------------------------------------------------------
 @router.message(AppState.notes_menu, F.text.lower() == "back")
 async def back_handler(message: Message, state: FSMContext):
     await state.set_state(AppState.main)

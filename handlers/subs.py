@@ -1,22 +1,27 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
-
-from keyboards.menu import get_main_reply_subs, get_main_reply_menu, get_current_user
-from database import add_subscription, get_subscriptions, delete_subscription
-from forms.app_states import AppState
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
+
 import aiosqlite
-from database import DB_NAME
+from dateutil.relativedelta import relativedelta
+from database import add_subscription, get_subscriptions, delete_subscription, DB_NAME
+from forms.app_states import AppState
+from handlers.auth import get_current_user
+from keyboards.menu import get_main_reply_subs, get_main_reply_menu
 
 router = Router()
+
+#MENU--------------------------------------------------------------------------------------
 
 @router.message(AppState.main, F.text.lower() == "subs")
 async def main_message(message: Message, state: FSMContext):
     await state.set_state(AppState.subs_menu)
     await message.answer("Subs Menu", reply_markup=get_main_reply_subs())
 
+
+
+#ADD SUB---------------------------------------------------------------------------------------
 @router.message(AppState.subs_menu, F.text.lower() == "add sub")
 async def main_menu(message: Message, state: FSMContext):
     await state.set_state(AppState.add_subscription_title)
@@ -25,12 +30,15 @@ async def main_menu(message: Message, state: FSMContext):
 @router.message(AppState.add_subscription_title)
 async def subs_title(message: Message, state: FSMContext):
     title = (message.text or "").strip()
+
     if not title:
         await message.answer("Title cannot be empty")
         return
+
     if len(title) > 50:
         await message.answer("Title is too long (max 50)")
         return
+
     await state.update_data(title=title)
     await state.set_state(AppState.add_subscription_price)
     await message.answer("price", reply_markup=ReplyKeyboardRemove())
@@ -42,7 +50,6 @@ async def subs_price(message: Message, state: FSMContext):
     if not text:
         await message.answer("Price cannot be empty")
         return
-
     try:
         price = int(text)
     except ValueError:
@@ -73,7 +80,7 @@ async def subs_end_date(message: Message, state: FSMContext):
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="Skip", callback_data="skip_sub_comm")]]
     )
-    await message.answer("Enter comment or press Skip", reply_markup=keyboard)
+    await message.answer("Enter comment or Skip", reply_markup=keyboard)
 
 
 @router.message(AppState.add_subscription_comment)
@@ -83,9 +90,9 @@ async def subs_comment(message: Message, state: FSMContext):
     price = data.get("price")
     end_date = data.get("end_date")
 
-    no_comment = (message.text or "").strip()
-    comment = None if no_comment.lower() == "skip" else no_comment
-    if len(no_comment) > 500:
+    comment = (message.text or "").strip()
+
+    if len(comment) > 500:
         await message.answer("Comment is too long (max 500)")
         return
 
@@ -103,8 +110,8 @@ async def subs_comment(message: Message, state: FSMContext):
     await state.set_state(AppState.subs_menu)
     await message.answer("Subs menu", reply_markup=get_main_reply_subs())
 
-#SKIP-------------------------------------------------------------------------------------------
 
+#SKIP--------------------------------------------------------------------------------------
 @router.callback_query(AppState.add_subscription_comment, F.data == "skip_sub_comm")
 async def skip_subs_comment(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -127,8 +134,8 @@ async def skip_subs_comment(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.subs_menu)
     await callback.message.answer("Subs section", reply_markup=get_main_reply_subs())
 
-#LIST-----------------------------------------------------------------------------
 
+#LIST--------------------------------------------------------------------------------------
 @router.message(AppState.subs_menu, F.text.lower() == "list subs")
 async def list_note_handler(message: Message, state: FSMContext):
     user = await get_current_user(message)
@@ -159,8 +166,8 @@ async def list_note_handler(message: Message, state: FSMContext):
     )
     await message.answer(text, reply_markup=keyboard)
 
-#EXTEND----------------------------------------------------------------------------
 
+#EXTEND------------------------------------------------------------------------------------
 @router.callback_query(AppState.subs_menu, F.data == "extend_sub")
 async def extend_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.extend_subscription_number)
@@ -309,8 +316,8 @@ async def back_list_number(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer("Enter sub num")
     await callback.answer()
 
-#DEL-----------------------------------------------------------------------------
 
+#DELETE------------------------------------------------------------------------------------
 @router.message(AppState.subs_menu, F.text.lower() == "del sub")
 async def delete_sub_start(message: Message, state: FSMContext):
     await state.set_state(AppState.delete_subscription_number)
@@ -348,6 +355,7 @@ async def delete_sub_by_number(message: Message, state: FSMContext):
     await state.clear()
     await state.set_state(AppState.subs_menu)
 
+#DEL SUB CB---------------------------------------------------------------------------------
 @router.callback_query(F.data.startswith("del_sub_"))
 async def delete_callback(callback: CallbackQuery):
     sub_id = int(callback.data.split("_")[2])
@@ -361,8 +369,8 @@ async def delete_callback(callback: CallbackQuery):
     await callback.message.edit_text("Successful")
     await callback.answer()
 
-#BACK-----------------------------------------------------------------------------
 
+#BACK--------------------------------------------------------------------------------------
 @router.message(AppState.subs_menu, F.text.lower() == "back")
 async def back_handler(message: Message, state: FSMContext):
     await state.set_state(AppState.main)
