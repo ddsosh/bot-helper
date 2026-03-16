@@ -22,6 +22,16 @@ async def show_main_menu(event, state: FSMContext):
 
     if isinstance(event, CallbackQuery):
         await event.message.edit_text(text, reply_markup=keyboard)
-    else:
-        msg = await event.answer(text, reply_markup=ReplyKeyboardRemove())
-        await msg.edit_text(text, reply_markup=keyboard)
+        return
+
+    # Message event: clear reply keyboard, then send inline menu
+    try:
+        remove_msg = await event.answer(" ", reply_markup=ReplyKeyboardRemove())
+        try:
+            await remove_msg.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    await event.answer(text, reply_markup=keyboard)
