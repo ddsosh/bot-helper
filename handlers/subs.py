@@ -81,7 +81,7 @@ async def subs_end_date(message: Message, state: FSMContext):
     await state.set_state(AppState.add_subscription_comment)
 
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="Skip", callback_data="skip_sub_comm")]]
+        inline_keyboard=[[InlineKeyboardButton(text="⏭️ Skip", callback_data="skip_sub_comm")]]
     )
     await message.answer("Enter comment or Skip", reply_markup=keyboard)
 
@@ -155,7 +155,7 @@ async def extend_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.extend_subscription_number)
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="cancel", callback_data="cancel_extend_sub")]
+            [InlineKeyboardButton(text="✖️ Cancel", callback_data="cancel_extend_sub")]
         ]
     )
     await callback.message.edit_text("Enter sub num", reply_markup=keyboard)
@@ -166,7 +166,7 @@ async def delete_sub_start_callback(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.delete_subscription_number)
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="cancel delete", callback_data="cancel_delete_sub")]
+            [InlineKeyboardButton(text="✖️ Cancel delete", callback_data="cancel_delete_sub")]
         ]
     )
     await callback.message.edit_text("Enter num", reply_markup=keyboard)
@@ -204,10 +204,10 @@ async def get_number(message: Message, state: FSMContext):
             ],
             [
                 InlineKeyboardButton(text="6 months", callback_data="extend_6"),
-                InlineKeyboardButton(text="...", callback_data="extend_other"),
+                InlineKeyboardButton(text="…", callback_data="extend_other"),
             ],
             [
-                InlineKeyboardButton(text="back", callback_data="back_list_number"),
+                InlineKeyboardButton(text="⬅️ Back", callback_data="back_list_number"),
             ]
         ]
     )
@@ -393,7 +393,7 @@ async def render_subs_list(event, state, user_id: int):
         if isinstance(event, CallbackQuery):
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="back", callback_data="menu:subs")]
+                    [InlineKeyboardButton(text="⬅️ Back", callback_data="menu:subs")]
                 ]
             )
             await event.message.edit_text("list empty", reply_markup=keyboard)
@@ -415,9 +415,9 @@ async def render_subs_list(event, state, user_id: int):
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="extend", callback_data="extend_sub")],
-            [InlineKeyboardButton(text="delete", callback_data="delete_sub")],
-            [InlineKeyboardButton(text="back", callback_data="menu:subs")],
+            [InlineKeyboardButton(text="⏳ Extend", callback_data="extend_sub")],
+            [InlineKeyboardButton(text="🗑️ Delete", callback_data="delete_sub")],
+            [InlineKeyboardButton(text="⬅️ Back", callback_data="menu:subs")],
         ]
     )
 

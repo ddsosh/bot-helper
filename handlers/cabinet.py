@@ -72,13 +72,13 @@ async def render_mail_list(event, state: FSMContext):
             )
 
     keyboard_buttons.append(
-        [InlineKeyboardButton(text="Add mail", callback_data="add_mail")]
+        [InlineKeyboardButton(text="➕ Add mail", callback_data="add_mail")]
     )
     keyboard_buttons.append(
-        [InlineKeyboardButton(text="Del mail", callback_data="del_mail")]
+        [InlineKeyboardButton(text="🗑️ Delete mail", callback_data="del_mail")]
     )
     keyboard_buttons.append(
-        [InlineKeyboardButton(text="Back", callback_data="back_cabinet")]
+        [InlineKeyboardButton(text="⬅️ Back", callback_data="back_cabinet")]
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
@@ -167,7 +167,7 @@ async def add_service_login (message: Message, state: FSMContext):
     await state.set_state(AppState.add_service_comment)
 
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="Skip", callback_data="skip_service_comm")]]
+        inline_keyboard=[[InlineKeyboardButton(text="⏭️ Skip", callback_data="skip_service_comm")]]
     )
     await message.answer("Service comment or Skip", reply_markup=keyboard)
 

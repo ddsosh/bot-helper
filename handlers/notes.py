@@ -41,7 +41,7 @@ async def note_title(message: Message, state: FSMContext):
     await state.set_state(AppState.add_note_date)
 
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="Skip", callback_data="skip_note_date")]]
+        inline_keyboard=[[InlineKeyboardButton(text="⏭️ Skip", callback_data="skip_note_date")]]
     )
     await message.answer("Enter date or press Skip", reply_markup=keyboard)
 
@@ -93,7 +93,7 @@ async def delete_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.delete_note_number)
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="cancel delete", callback_data="cancel_delete_note")]
+            [InlineKeyboardButton(text="✖️ Cancel delete", callback_data="cancel_delete_note")]
         ]
     )
     await callback.message.edit_text("Enter number to delete:", reply_markup=keyboard)
@@ -164,7 +164,7 @@ async def render_notes_list(event, state, user_id: int):
         if isinstance(event, CallbackQuery):
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="back", callback_data="menu:notes")]
+                    [InlineKeyboardButton(text="⬅️ Back", callback_data="menu:notes")]
                 ]
             )
             await event.message.edit_text("list empty", reply_markup=keyboard)
@@ -186,8 +186,8 @@ async def render_notes_list(event, state, user_id: int):
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="delete", callback_data="delete_note")],
-            [InlineKeyboardButton(text="back", callback_data="menu:notes")],
+            [InlineKeyboardButton(text="🗑️ Delete", callback_data="delete_note")],
+            [InlineKeyboardButton(text="⬅️ Back", callback_data="menu:notes")],
         ]
     )
 
