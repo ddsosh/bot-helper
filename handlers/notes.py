@@ -1,27 +1,30 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 
 from database import delete_note, get_notes, add_note
 from forms.app_states import AppState
 from handlers.auth import get_current_user
-from keyboards.menu import get_main_reply_notes, get_main_reply_menu
+from keyboards.menu import get_notes_inline_menu
+from handlers.session import show_main_menu
 
 
 router = Router()
 
 #MENU--------------------------------------------------------------------------------------
 
-@router.message(AppState.main, F.text.lower() == "notes")
-async def notes_menu(message: Message, state: FSMContext):
+@router.callback_query(F.data == "menu:notes")
+async def notes_menu(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.notes_menu)
-    await message.answer("Notes section", reply_markup=get_main_reply_notes())
+    await callback.message.edit_text("Notes section", reply_markup=get_notes_inline_menu())
+    await callback.answer()
 
 #ADD NOTE---------------------------------------------------------------------------------------
-@router.message(AppState.notes_menu, F.text.lower() == "add note")
-async def add_note_start(message: Message, state: FSMContext):
+@router.callback_query(AppState.notes_menu, F.data == "notes:add")
+async def add_note_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.add_note_title)
-    await message.answer("name", reply_markup=ReplyKeyboardRemove())
+    await callback.message.edit_text("name")
+    await callback.answer()
 
 
 @router.message(AppState.add_note_title)
@@ -62,7 +65,7 @@ async def note_date(message: Message, state: FSMContext):
     user = await get_current_user(message)
     if not user:
         await state.set_state(AppState.main)
-        await message.answer("error(user not found) /start", reply_markup=get_main_reply_menu())
+        await message.answer("error(user not found) /start")
         return
 
     await add_note(user[0], title, due_date)
@@ -70,17 +73,18 @@ async def note_date(message: Message, state: FSMContext):
 
     await state.clear()
     await state.set_state(AppState.notes_menu)
-    await message.answer("Notes section", reply_markup=get_main_reply_notes())
+    await message.answer("Notes section", reply_markup=get_notes_inline_menu())
 
 
 #LIST NOTES--------------------------------------------------------------------------------------
-@router.message(AppState.notes_menu, F.text.lower() == "list notes")
-async def list_note_handler(message: Message, state: FSMContext):
-    user = await get_current_user(message)
+@router.callback_query(AppState.notes_menu, F.data == "notes:list")
+async def list_note_handler(callback: CallbackQuery, state: FSMContext):
+    user = await get_current_user(callback)
     if not user:
-        await message.answer("error(list) /start")
+        await callback.answer("error(list) /start")
         return
-    await render_notes_list(message, state, user[0])
+    await render_notes_list(callback, state, user[0])
+    await callback.answer()
 
 
 #DELETE NOTE------------------------------------------------------------------------------------
@@ -92,7 +96,7 @@ async def delete_start(callback: CallbackQuery, state: FSMContext):
             [InlineKeyboardButton(text="cancel delete", callback_data="cancel_delete_note")]
         ]
     )
-    await callback.message.answer("Enter number to delete:", reply_markup=keyboard)
+    await callback.message.edit_text("Enter number to delete:", reply_markup=keyboard)
     await callback.answer()
 
 
@@ -120,7 +124,7 @@ async def delete_by_number(message: Message, state: FSMContext):
     user = await get_current_user(message)
     if not user:
         await state.set_state(AppState.main)
-        await message.answer("error(user not found) /start", reply_markup=get_main_reply_menu())
+        await message.answer("error(user not found) /start")
         return
 
     await delete_note(user[0], note_id)
@@ -130,7 +134,7 @@ async def delete_by_number(message: Message, state: FSMContext):
 
 #DEL NOTE CB---------------------------------------------------------------------------------
 @router.callback_query(F.data.startswith("del_note_"))
-async def delete_callback(callback: CallbackQuery):
+async def delete_callback(callback: CallbackQuery, state: FSMContext):
     note_id = int(callback.data.split("_")[2])
     user = await get_current_user(callback)
     if not user:
@@ -138,7 +142,7 @@ async def delete_callback(callback: CallbackQuery):
         return
 
     await delete_note(user[0], note_id)
-    await render_notes_list(callback, state=None, user_id=user[0])
+    await render_notes_list(callback, state, user_id=user[0])
     await callback.answer()
 
 
@@ -158,7 +162,12 @@ async def render_notes_list(event, state, user_id: int):
     notes = await get_notes(user_id)
     if not notes:
         if isinstance(event, CallbackQuery):
-            await event.message.edit_text("list empty")
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="back", callback_data="menu:notes")]
+                ]
+            )
+            await event.message.edit_text("list empty", reply_markup=keyboard)
         else:
             await event.answer("list empty")
         return
@@ -177,7 +186,8 @@ async def render_notes_list(event, state, user_id: int):
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="delete", callback_data="delete_note")]
+            [InlineKeyboardButton(text="delete", callback_data="delete_note")],
+            [InlineKeyboardButton(text="back", callback_data="menu:notes")],
         ]
     )
 
@@ -203,21 +213,20 @@ async def skip_note_date(callback: CallbackQuery, state: FSMContext):
 
     if not user:
         await state.set_state(AppState.main)
-        await callback.message.answer("error(user not found) /start", reply_markup=get_main_reply_menu())
+        await callback.message.answer("error(user not found) /start")
         await callback.answer()
         return
 
     await add_note(user[0], title, None)
-    await callback.message.edit_text("OK Note saved without date")
     await callback.answer()
 
     await state.clear()
     await state.set_state(AppState.notes_menu)
-    await callback.message.answer("Notes section", reply_markup=get_main_reply_notes())
+    await callback.message.edit_text("Notes section", reply_markup=get_notes_inline_menu())
 
 
 #BACK--------------------------------------------------------------------------------------
-@router.message(AppState.notes_menu, F.text.lower() == "back")
-async def back_handler(message: Message, state: FSMContext):
-    await state.set_state(AppState.main)
-    await message.answer("Main menu", reply_markup=get_main_reply_menu())
+@router.callback_query(AppState.notes_menu, F.data == "menu:main")
+async def back_handler(callback: CallbackQuery, state: FSMContext):
+    await show_main_menu(callback, state)
+    await callback.answer()

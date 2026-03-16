@@ -5,7 +5,8 @@ from aiogram.fsm.context import FSMContext
 from database import get_mail, get_services_by_mail, add_service, add_mail, delete_service, delete_mail
 from forms.app_states import AppState
 from handlers.auth import get_current_user
-from keyboards.menu import get_main_reply_menu, get_main_reply_cabinet
+from keyboards.menu import get_cabinet_inline_menu
+from handlers.session import show_main_menu
 from keyboards.services import get_services_keyboard
 
 router = Router()
@@ -29,21 +30,21 @@ async def require_user(event):
     return user
 
 #MENU--------------------------------------------------------------------------------------
-@router.message(AppState.main, F.text.lower() == "cabinet")
-async def cabinet_handler(message: Message, state: FSMContext):
+@router.callback_query(F.data == "menu:cabinet")
+async def cabinet_handler(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.cabinet_menu)
-    await message.answer("Cabinet", reply_markup=get_main_reply_cabinet())
+    await callback.message.edit_text("Cabinet", reply_markup=get_cabinet_inline_menu())
+    await callback.answer()
 
 
-@router.message(AppState.cabinet_menu, F.text.lower() == "mail")
-async def cabinet_message(message: Message, state: FSMContext):
-    user = await require_user(message)
+@router.callback_query(AppState.cabinet_menu, F.data == "cabinet:mail")
+async def cabinet_message(callback: CallbackQuery, state: FSMContext):
+    user = await require_user(callback)
 
     if not user:
         return
-
-    await message.answer("Mail:", reply_markup=ReplyKeyboardRemove())
-    await render_mail_list(message, state)
+    await render_mail_list(callback, state)
+    await callback.answer()
 
 @router.callback_query(AppState.mail_list, F.data.startswith("mail_"))
 async def mail_list(callback: CallbackQuery, state: FSMContext):
@@ -209,14 +210,14 @@ async def skip_service_comment(callback: CallbackQuery, state: FSMContext):
 
     if not user:
         await state.set_state(AppState.main)
-        await callback.message.answer("error(user not found) /start", reply_markup=get_main_reply_menu())
+        await callback.message.answer("error(user not found) /start")
         await callback.answer()
         return
 
     created = await add_service(user[0], mail_id, service_name, login, None)
     if not created:
         await state.set_state(AppState.main)
-        await callback.message.answer("Mail not found. /start", reply_markup=get_main_reply_menu())
+        await callback.message.answer("Mail not found. /start")
         await callback.answer()
         return
     await callback.answer("OK service saved without comment")
@@ -230,10 +231,10 @@ async def skip_service_comment(callback: CallbackQuery, state: FSMContext):
 async def back_handler(callback: CallbackQuery, state: FSMContext):
     await render_mail_list(callback, state)
 
-@router.message(AppState.cabinet_menu, F.text.lower() == "back")
-async def back_handler(message: Message, state: FSMContext):
-    await state.set_state(AppState.main)
-    await message.answer("Main menu", reply_markup=get_main_reply_menu())
+@router.callback_query(AppState.cabinet_menu, F.data == "menu:main")
+async def back_handler(callback: CallbackQuery, state: FSMContext):
+    await show_main_menu(callback, state)
+    await callback.answer()
 
 @router.callback_query(AppState.mail_list, F.data == "back_services")
 async def back_to_services(callback: CallbackQuery, state: FSMContext):
@@ -246,8 +247,7 @@ async def back_to_services(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(AppState.mail_list, F.data == "back_cabinet")
 async def back_to_cabinet(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.cabinet_menu)
-    await callback.message.delete()
-    await callback.message.answer("Cabinet", reply_markup=get_main_reply_cabinet())
+    await callback.message.edit_text("Cabinet", reply_markup=get_cabinet_inline_menu())
     await callback.answer()
 
 #FORM SERV-------------------------------------------------------------------------------------------

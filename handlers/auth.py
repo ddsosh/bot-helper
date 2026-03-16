@@ -5,7 +5,7 @@ from aiogram.types import Message
 
 from database import ensure_user
 from forms.app_states import AppState
-from keyboards.menu import get_main_reply_menu
+from handlers.session import show_main_menu
 
 router = Router()
 
@@ -13,11 +13,9 @@ router = Router()
 @router.message(Command("start"))
 async def start(message: Message, state: FSMContext):
     await ensure_user(message.from_user.id)
-    await state.set_state(AppState.main)
-    await message.answer("Choose section", reply_markup=get_main_reply_menu())
+    await show_main_menu(message, state)
 
 #GET_USER-----------------------------------------------------------------------------------
 
 async def get_current_user(event):
     return await ensure_user(event.from_user.id)
-

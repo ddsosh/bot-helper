@@ -8,24 +8,27 @@ from dateutil.relativedelta import relativedelta
 from database import add_subscription, get_subscriptions, delete_subscription, DB_NAME
 from forms.app_states import AppState
 from handlers.auth import get_current_user
-from keyboards.menu import get_main_reply_subs, get_main_reply_menu
+from keyboards.menu import get_subs_inline_menu
+from handlers.session import show_main_menu
 
 router = Router()
 
 #MENU--------------------------------------------------------------------------------------
 
-@router.message(AppState.main, F.text.lower() == "subs")
-async def main_message(message: Message, state: FSMContext):
+@router.callback_query(F.data == "menu:subs")
+async def main_message(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.subs_menu)
-    await message.answer("Subs Menu", reply_markup=get_main_reply_subs())
+    await callback.message.edit_text("Subs Menu", reply_markup=get_subs_inline_menu())
+    await callback.answer()
 
 
 
 #ADD SUB---------------------------------------------------------------------------------------
-@router.message(AppState.subs_menu, F.text.lower() == "add sub")
-async def main_menu(message: Message, state: FSMContext):
+@router.callback_query(AppState.subs_menu, F.data == "subs:add")
+async def main_menu(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.add_subscription_title)
-    await message.answer("name", reply_markup=ReplyKeyboardRemove())
+    await callback.message.edit_text("name")
+    await callback.answer()
 
 @router.message(AppState.add_subscription_title)
 async def subs_title(message: Message, state: FSMContext):
@@ -100,7 +103,7 @@ async def subs_comment(message: Message, state: FSMContext):
 
     if not user:
         await state.set_state(AppState.main)
-        await message.answer("error(user not found) /start", reply_markup=get_main_reply_menu())
+        await message.answer("error(user not found) /start")
         return
 
     await add_subscription(user[0], title, price, end_date, comment)
@@ -108,7 +111,7 @@ async def subs_comment(message: Message, state: FSMContext):
 
     await state.clear()
     await state.set_state(AppState.subs_menu)
-    await message.answer("Subs menu", reply_markup=get_main_reply_subs())
+    await message.answer("Subs menu", reply_markup=get_subs_inline_menu())
 
 
 #SKIP--------------------------------------------------------------------------------------
@@ -123,33 +126,39 @@ async def skip_subs_comment(callback: CallbackQuery, state: FSMContext):
 
     if not user:
         await state.set_state(AppState.main)
-        await callback.message.answer("error(user not found) /start", reply_markup=get_main_reply_menu())
+        await callback.message.answer("error(user not found) /start")
         await callback.answer()
         return
 
     await add_subscription(user[0], title,  price, end_date,  None)
-    await callback.answer("OK sub saved without comment")
+    await callback.answer()
 
     await state.clear()
     await state.set_state(AppState.subs_menu)
-    await callback.message.answer("Subs section", reply_markup=get_main_reply_subs())
+    await callback.message.edit_text("Subs section", reply_markup=get_subs_inline_menu())
 
 
 #LIST--------------------------------------------------------------------------------------
-@router.message(AppState.subs_menu, F.text.lower() == "list subs")
-async def list_note_handler(message: Message, state: FSMContext):
-    user = await get_current_user(message)
+@router.callback_query(AppState.subs_menu, F.data == "subs:list")
+async def list_note_handler(callback: CallbackQuery, state: FSMContext):
+    user = await get_current_user(callback)
     if not user:
-        await message.answer("error(list) /start")
+        await callback.answer("error(list) /start")
         return
-    await render_subs_list(message, state, user[0])
+    await render_subs_list(callback, state, user[0])
+    await callback.answer()
 
 
 #EXTEND------------------------------------------------------------------------------------
 @router.callback_query(AppState.subs_menu, F.data == "extend_sub")
 async def extend_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.extend_subscription_number)
-    await callback.message.answer("Enter sub num", reply_markup=ReplyKeyboardRemove())
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="cancel", callback_data="cancel_extend_sub")]
+        ]
+    )
+    await callback.message.edit_text("Enter sub num", reply_markup=keyboard)
     await callback.answer()
 
 @router.callback_query(AppState.subs_menu, F.data == "delete_sub")
@@ -160,7 +169,7 @@ async def delete_sub_start_callback(callback: CallbackQuery, state: FSMContext):
             [InlineKeyboardButton(text="cancel delete", callback_data="cancel_delete_sub")]
         ]
     )
-    await callback.message.answer("Enter num", reply_markup=keyboard)
+    await callback.message.edit_text("Enter num", reply_markup=keyboard)
     await callback.answer()
 
 @router.message(AppState.extend_subscription_number)
@@ -238,7 +247,7 @@ async def process_extension(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
         return
 
-    await callback.message.answer("Subscription extended", reply_markup=get_main_reply_subs())
+    await callback.message.answer("Subscription extended", reply_markup=get_subs_inline_menu())
     await state.set_state(AppState.subs_menu)
     await callback.answer()
 
@@ -295,7 +304,7 @@ async def process_custom_months(message: Message, state: FSMContext):
 
     await extend_subscription_date(subscription_id, months)
 
-    await message.answer("Subscription extended", reply_markup=get_main_reply_subs())
+    await message.answer("Subscription extended", reply_markup=get_subs_inline_menu())
     await state.set_state(AppState.subs_menu)
 
 
@@ -332,7 +341,7 @@ async def delete_sub_by_number(message: Message, state: FSMContext):
     user = await get_current_user(message)
     if not user:
         await state.set_state(AppState.main)
-        await message.answer("error(user not found) /start", reply_markup=get_main_reply_menu())
+        await message.answer("error(user not found) /start")
         return
 
     await delete_subscription(user[0], sub_id)
@@ -341,7 +350,7 @@ async def delete_sub_by_number(message: Message, state: FSMContext):
 
 #DEL SUB CB---------------------------------------------------------------------------------
 @router.callback_query(F.data.startswith("del_sub_"))
-async def delete_callback(callback: CallbackQuery):
+async def delete_callback(callback: CallbackQuery, state: FSMContext):
     sub_id = int(callback.data.split("_")[2])
     user = await get_current_user(callback)
 
@@ -350,7 +359,7 @@ async def delete_callback(callback: CallbackQuery):
         return
 
     await delete_subscription(user[0], sub_id)
-    await render_subs_list(callback, state=None, user_id=user[0])
+    await render_subs_list(callback, state, user_id=user[0])
     await callback.answer()
 
 
@@ -366,11 +375,28 @@ async def cancel_delete_sub(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+@router.callback_query(AppState.extend_subscription_number, F.data == "cancel_extend_sub")
+async def cancel_extend_sub(callback: CallbackQuery, state: FSMContext):
+    user = await get_current_user(callback)
+    if not user:
+        await callback.answer("error(user not found) /start")
+        return
+
+    await state.set_state(AppState.subs_menu)
+    await render_subs_list(callback, state, user[0])
+    await callback.answer()
+
+
 async def render_subs_list(event, state, user_id: int):
     subs = await get_subscriptions(user_id)
     if not subs:
         if isinstance(event, CallbackQuery):
-            await event.message.edit_text("list empty")
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="back", callback_data="menu:subs")]
+                ]
+            )
+            await event.message.edit_text("list empty", reply_markup=keyboard)
         else:
             await event.answer("list empty")
         return
@@ -391,6 +417,7 @@ async def render_subs_list(event, state, user_id: int):
         inline_keyboard=[
             [InlineKeyboardButton(text="extend", callback_data="extend_sub")],
             [InlineKeyboardButton(text="delete", callback_data="delete_sub")],
+            [InlineKeyboardButton(text="back", callback_data="menu:subs")],
         ]
     )
 
@@ -401,7 +428,7 @@ async def render_subs_list(event, state, user_id: int):
 
 
 #BACK--------------------------------------------------------------------------------------
-@router.message(AppState.subs_menu, F.text.lower() == "back")
-async def back_handler(message: Message, state: FSMContext):
-    await state.set_state(AppState.main)
-    await message.answer("Main menu", reply_markup=get_main_reply_menu())
+@router.callback_query(AppState.subs_menu, F.data == "menu:main")
+async def back_handler(callback: CallbackQuery, state: FSMContext):
+    await show_main_menu(callback, state)
+    await callback.answer()
