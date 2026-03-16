@@ -4,7 +4,7 @@ import os
 
 import aiosqlite
 
-DB_NAME = "content.db"
+DB_NAME = os.path.join("data", "content.db")
 
 
 async def init_db():
