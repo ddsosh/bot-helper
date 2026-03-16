@@ -71,9 +71,9 @@ async def movie_comment(message: Message, state: FSMContext):
 
     user = await get_current_user(message)
     if not user:
-    await state.set_state(AppState.main)
-    await message.answer("error(user not found) /start")
-    return
+        await state.set_state(AppState.main)
+        await message.answer("error(user not found) /start")
+        return
 
     await add_movie(user[0], title, type_, comment)
     await message.answer("OK")
