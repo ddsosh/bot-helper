@@ -19,6 +19,7 @@ async def require_user(event):
 
         if isinstance(event, CallbackQuery):
             await event.message.answer("User not found. /start")
+            await event.answer()
 
         if isinstance(event, Message):
             await event.answer("User not found. /start")
@@ -34,14 +35,14 @@ async def cabinet_handler(message: Message, state: FSMContext):
     await message.answer("Cabinet", reply_markup=get_main_reply_cabinet())
 
 
-@router.callback_query(AppState.cabinet_menu, F.data == "mail")
-async def cabinet_callback_query(callback: CallbackQuery, state: FSMContext):
-    user = await require_user(callback)
+@router.message(AppState.cabinet_menu, F.text.lower() == "mail")
+async def cabinet_message(message: Message, state: FSMContext):
+    user = await require_user(message)
 
     if not user:
         return
 
-    await render_mail_list(callback, state)
+    await render_mail_list(message, state)
 
 @router.callback_query(AppState.mail_list, F.data.startswith("mail_"))
 async def mail_list(callback: CallbackQuery, state: FSMContext):
@@ -233,7 +234,7 @@ async def back_handler(message: Message, state: FSMContext):
     await state.set_state(AppState.main)
     await message.answer("Main menu", reply_markup=get_main_reply_menu())
 
-@router.callback_query(F.data == "back_services")
+@router.callback_query(AppState.mail_list, F.data == "back_services")
 async def back_to_services(callback: CallbackQuery, state: FSMContext):
 
     data = await state.get_data()
@@ -244,7 +245,8 @@ async def back_to_services(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(AppState.mail_list, F.data == "back_cabinet")
 async def back_to_cabinet(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.cabinet_menu)
-    await callback.message.edit_text("Cabinet", reply_markup=get_main_reply_cabinet())
+    await callback.message.delete()
+    await callback.message.answer("Cabinet", reply_markup=get_main_reply_cabinet())
     await callback.answer()
 
 #FORM SERV-------------------------------------------------------------------------------------------
@@ -401,7 +403,7 @@ async def delete_mail_handler(callback: CallbackQuery, state: FSMContext):
     await delete_mail(user[0], mail_id)
     await callback.answer("Mail deleted")
     await render_mail_list(callback, state)
-
+#TEST F---------------------------------------------------------------------------------
 async def send_or_edit(event, text, keyboard):
     msg = None
     if isinstance(event, CallbackQuery):
