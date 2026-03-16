@@ -161,7 +161,8 @@ async def list_note_handler(message: Message, state: FSMContext):
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="extend", callback_data="extend_sub")]
+            [InlineKeyboardButton(text="extend", callback_data="extend_sub")],
+            [InlineKeyboardButton(text="delete", callback_data="delete_sub")],
         ]
     )
     await message.answer(text, reply_markup=keyboard)
@@ -172,6 +173,12 @@ async def list_note_handler(message: Message, state: FSMContext):
 async def extend_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.extend_subscription_number)
     await callback.message.answer("Enter sub num", reply_markup=ReplyKeyboardRemove())
+    await callback.answer()
+
+@router.callback_query(AppState.subs_menu, F.data == "delete_sub")
+async def delete_sub_start_callback(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(AppState.delete_subscription_number)
+    await callback.message.answer("Enter num", reply_markup=ReplyKeyboardRemove())
     await callback.answer()
 
 @router.message(AppState.extend_subscription_number)
@@ -318,10 +325,6 @@ async def back_list_number(callback: CallbackQuery, state: FSMContext):
 
 
 #DELETE------------------------------------------------------------------------------------
-@router.message(AppState.subs_menu, F.text.lower() == "del sub")
-async def delete_sub_start(message: Message, state: FSMContext):
-    await state.set_state(AppState.delete_subscription_number)
-    await message.answer("Enter num", reply_markup=ReplyKeyboardRemove())
 
 @router.message(AppState.delete_subscription_number)
 async def delete_sub_by_number(message: Message, state: FSMContext):

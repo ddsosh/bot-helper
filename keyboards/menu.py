@@ -24,7 +24,7 @@ def get_main_reply_movies():
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="add movie"), KeyboardButton(text="list movies")],
-            [KeyboardButton(text="del movie"), KeyboardButton(text="back")],
+            [KeyboardButton(text="back")],
         ],
         resize_keyboard=True
     )
@@ -35,7 +35,7 @@ def get_main_reply_notes():
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="add note"), KeyboardButton(text="list notes")],
-            [KeyboardButton(text="del note"), KeyboardButton(text="back")],
+            [KeyboardButton(text="back")],
         ],
         resize_keyboard=True
     )
@@ -45,7 +45,7 @@ def get_main_reply_subs():
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="add sub"), KeyboardButton(text="list subs")],
-            [KeyboardButton(text="del sub"), KeyboardButton(text="back")],
+            [KeyboardButton(text="back")],
         ],
         resize_keyboard=True
     )

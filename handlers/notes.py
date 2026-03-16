@@ -1,4 +1,4 @@
-﻿from aiogram import Router, F
+from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 
@@ -96,14 +96,20 @@ async def list_note_handler(message: Message, state: FSMContext):
         note_map[index] = note_id
 
     await state.update_data(note_map=note_map)
-    await message.answer(text)
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="delete", callback_data="delete_note")]
+        ]
+    )
+    await message.answer(text, reply_markup=keyboard)
 
 
 #DELETE NOTE------------------------------------------------------------------------------------
-@router.message(AppState.notes_menu, F.text.lower() == "del note")
-async def delete_start(message: Message, state: FSMContext):
+@router.callback_query(AppState.notes_menu, F.data == "delete_note")
+async def delete_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.delete_note_number)
-    await message.answer("Enter number to delete:", reply_markup=ReplyKeyboardRemove())
+    await callback.message.answer("Enter number to delete:", reply_markup=ReplyKeyboardRemove())
+    await callback.answer()
 
 
 @router.message(AppState.delete_note_number)

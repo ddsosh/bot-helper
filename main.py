@@ -6,6 +6,7 @@ from aiogram import Bot, Dispatcher
 from dotenv import load_dotenv
 from database import init_db
 from handlers.auth import router as auth_router
+from handlers.session import router as session_router
 from handlers.movies import router as movies_router
 from keyboards.menu import router as menu_router
 from handlers.notes import router as notes_router
@@ -25,6 +26,7 @@ async def main():
     bot = Bot(token=TOKEN)
     await init_db()
     dp.include_router(auth_router)
+    dp.include_router(session_router)
     dp.include_router(movies_router)
     dp.include_router(menu_router)
     dp.include_router(notes_router)

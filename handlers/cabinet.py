@@ -42,6 +42,7 @@ async def cabinet_message(message: Message, state: FSMContext):
     if not user:
         return
 
+    await message.answer("Mail:", reply_markup=ReplyKeyboardRemove())
     await render_mail_list(message, state)
 
 @router.callback_query(AppState.mail_list, F.data.startswith("mail_"))
