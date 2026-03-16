@@ -3,7 +3,6 @@ import logging
 from os import getenv
 
 from aiogram import Bot, Dispatcher
-from aiogram.client.session.aiohttp import AiohttpSession
 from dotenv import load_dotenv
 from database import init_db
 from handlers.auth import router as auth_router
@@ -23,9 +22,7 @@ dp = Dispatcher()
 async def main():
     if not TOKEN:
         raise RuntimeError("BOT_TOKEN is not set")
-    proxy_url = getenv("BOT_PROXY")
-    session = AiohttpSession(proxy=proxy_url, timeout=90) if proxy_url else AiohttpSession(timeout=90)
-    bot = Bot(token=TOKEN, session=session)
+    bot = Bot(token=TOKEN)
     await init_db()
     dp.include_router(auth_router)
     dp.include_router(movies_router)
