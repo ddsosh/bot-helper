@@ -4,8 +4,8 @@ from aiogram.fsm.context import FSMContext
 
 from database import get_mail, get_services_by_mail, add_service, add_mail, delete_service, delete_mail
 from forms.app_states import AppState
-from handlers.auth import get_current_user
-from keyboards.menu import get_cabinet_inline_menu
+from handlers.auth import get_current_user, get_user_lang
+from keyboards.menu import get_cabinet_inline_menu, get_label
 from handlers.session import show_main_menu
 from keyboards.services import get_services_keyboard
 
@@ -33,7 +33,9 @@ async def require_user(event):
 @router.callback_query(F.data == "menu:cabinet")
 async def cabinet_handler(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.cabinet_menu)
-    await callback.message.edit_text("Cabinet", reply_markup=get_cabinet_inline_menu())
+    user = await get_current_user(callback)
+    lang = get_user_lang(user)
+    await callback.message.edit_text("Cabinet", reply_markup=get_cabinet_inline_menu(lang))
     await callback.answer()
 
 
@@ -59,6 +61,7 @@ async def render_mail_list(event, state: FSMContext):
     if not user:
         return
 
+    lang = get_user_lang(user)
     mails = await get_mail(user[0])
 
     keyboard_buttons = []
@@ -72,13 +75,13 @@ async def render_mail_list(event, state: FSMContext):
             )
 
     keyboard_buttons.append(
-        [InlineKeyboardButton(text="➕ Add mail", callback_data="add_mail")]
+        [InlineKeyboardButton(text=get_label(lang, "add_mail"), callback_data="add_mail")]
     )
     keyboard_buttons.append(
-        [InlineKeyboardButton(text="🗑️ Delete mail", callback_data="del_mail")]
+        [InlineKeyboardButton(text=get_label(lang, "delete_mail"), callback_data="del_mail")]
     )
     keyboard_buttons.append(
-        [InlineKeyboardButton(text="⬅️ Back", callback_data="back_cabinet")]
+        [InlineKeyboardButton(text=get_label(lang, "back"), callback_data="back_cabinet")]
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
@@ -101,9 +104,10 @@ async def render_services(event, state: FSMContext, mail_id: int):
     if not user:
         return
 
+    lang = get_user_lang(user)
     services = await get_services_by_mail(user[0], mail_id)
 
-    keyboard = get_services_keyboard()
+    keyboard = get_services_keyboard(lang)
 
     text = format_services(services)
 
@@ -166,8 +170,12 @@ async def add_service_login (message: Message, state: FSMContext):
     await state.update_data(login=login)
     await state.set_state(AppState.add_service_comment)
 
+    user = await require_user(message)
+    if not user:
+        return
+    lang = get_user_lang(user)
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="⏭️ Skip", callback_data="skip_service_comm")]]
+        inline_keyboard=[[InlineKeyboardButton(text=get_label(lang, "skip"), callback_data="skip_service_comm")]]
     )
     await message.answer("Service comment or Skip", reply_markup=keyboard)
 
@@ -247,7 +255,9 @@ async def back_to_services(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(AppState.mail_list, F.data == "back_cabinet")
 async def back_to_cabinet(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.cabinet_menu)
-    await callback.message.edit_text("Cabinet", reply_markup=get_cabinet_inline_menu())
+    user = await get_current_user(callback)
+    lang = get_user_lang(user)
+    await callback.message.edit_text("Cabinet", reply_markup=get_cabinet_inline_menu(lang))
     await callback.answer()
 
 #FORM SERV-------------------------------------------------------------------------------------------
@@ -313,6 +323,7 @@ async def delete_service_mode(callback: CallbackQuery, state: FSMContext):
     if not user:
         return
 
+    lang = get_user_lang(user)
     services = await get_services_by_mail(user[0], mail_id)
 
     if not services:
@@ -327,13 +338,13 @@ async def delete_service_mode(callback: CallbackQuery, state: FSMContext):
 
         keyboard_buttons.append(
             [InlineKeyboardButton(
-                text=f"Delete {service_name}",
+                text=get_label(lang, "delete_item", name=service_name),
                 callback_data=f"delete_service_{service_id}"
             )]
         )
 
     keyboard_buttons.append(
-        [InlineKeyboardButton(text="Back", callback_data="back_services")]
+        [InlineKeyboardButton(text=get_label(lang, "back"), callback_data="back_services")]
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
@@ -367,6 +378,7 @@ async def delete_mail_mode(callback: CallbackQuery, state: FSMContext):
     if not user:
         return
 
+    lang = get_user_lang(user)
     mails = await get_mail(user[0])
 
     if not mails:
@@ -379,13 +391,13 @@ async def delete_mail_mode(callback: CallbackQuery, state: FSMContext):
 
         keyboard_buttons.append(
             [InlineKeyboardButton(
-                text=f"Delete {email}",
+                text=get_label(lang, "delete_item", name=email),
                 callback_data=f"delete_mail_{mail_id}"
             )]
         )
 
     keyboard_buttons.append(
-        [InlineKeyboardButton(text="Back", callback_data="back_mail_list")]
+        [InlineKeyboardButton(text=get_label(lang, "back"), callback_data="back_mail_list")]
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
@@ -404,6 +416,7 @@ async def delete_mail_handler(callback: CallbackQuery, state: FSMContext):
     await delete_mail(user[0], mail_id)
     await callback.answer("Mail deleted")
     await render_mail_list(callback, state)
+
 #TEST F---------------------------------------------------------------------------------
 async def send_or_edit(event, text, keyboard):
     msg = None
@@ -415,4 +428,3 @@ async def send_or_edit(event, text, keyboard):
         msg = await event.answer(text, reply_markup=keyboard)
 
     return msg
-

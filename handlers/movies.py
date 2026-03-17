@@ -2,9 +2,8 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 
-
-from keyboards.menu import get_movies_inline_menu
-from handlers.auth import get_current_user
+from keyboards.menu import get_movies_inline_menu, get_label
+from handlers.auth import get_current_user, get_user_lang
 from database import get_movies, delete_movie, add_movie
 from forms.app_states import AppState
 from handlers.session import show_main_menu
@@ -18,7 +17,9 @@ router = Router()
 @router.callback_query(F.data == "menu:movies")
 async def movies_menu(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.movies_menu)
-    await callback.message.edit_text("Movies section", reply_markup=get_movies_inline_menu())
+    user = await get_current_user(callback)
+    lang = get_user_lang(user)
+    await callback.message.edit_text("Movies section", reply_markup=get_movies_inline_menu(lang))
     await callback.answer()
 
 
@@ -80,7 +81,8 @@ async def movie_comment(message: Message, state: FSMContext):
 
     await state.clear()
     await state.set_state(AppState.movies_menu)
-    await message.answer("Movies section", reply_markup=get_movies_inline_menu())
+    lang = get_user_lang(user)
+    await message.answer("Movies section", reply_markup=get_movies_inline_menu(lang))
 
 
 #LIST MOVIE--------------------------------------------------------------------------------------
@@ -98,9 +100,11 @@ async def list_movies_handler(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(AppState.movies_menu, F.data == "delete_movie")
 async def delete_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.delete_movie_number)
+    user = await get_current_user(callback)
+    lang = get_user_lang(user)
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="✖️ Cancel delete", callback_data="cancel_delete_movie")]
+            [InlineKeyboardButton(text=get_label(lang, "cancel_delete"), callback_data="cancel_delete_movie")]
         ]
     )
     await callback.message.answer("Enter number to delete:", reply_markup=keyboard)
@@ -173,12 +177,14 @@ async def cancel_delete_movie(callback: CallbackQuery, state: FSMContext):
 
 
 async def render_movies_list(event, state, user_id: int):
+    user = await get_current_user(event)
+    lang = get_user_lang(user)
     movies = await get_movies(user_id)
     if not movies:
         if isinstance(event, CallbackQuery):
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="⬅️ Back", callback_data="menu:movies")]
+                    [InlineKeyboardButton(text=get_label(lang, "back"), callback_data="menu:movies")]
                 ]
             )
             await event.message.edit_text("list empty", reply_markup=keyboard)
@@ -199,8 +205,8 @@ async def render_movies_list(event, state, user_id: int):
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🗑️ Delete", callback_data="delete_movie")],
-            [InlineKeyboardButton(text="⬅️ Back", callback_data="menu:movies")],
+            [InlineKeyboardButton(text=get_label(lang, "delete"), callback_data="delete_movie")],
+            [InlineKeyboardButton(text=get_label(lang, "back"), callback_data="menu:movies")],
         ]
     )
 

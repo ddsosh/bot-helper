@@ -4,8 +4,8 @@ from aiogram.fsm.context import FSMContext
 
 from database import delete_note, get_notes, add_note
 from forms.app_states import AppState
-from handlers.auth import get_current_user
-from keyboards.menu import get_notes_inline_menu
+from handlers.auth import get_current_user, get_user_lang
+from keyboards.menu import get_notes_inline_menu, get_label
 from handlers.session import show_main_menu
 
 
@@ -16,7 +16,9 @@ router = Router()
 @router.callback_query(F.data == "menu:notes")
 async def notes_menu(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.notes_menu)
-    await callback.message.edit_text("Notes section", reply_markup=get_notes_inline_menu())
+    user = await get_current_user(callback)
+    lang = get_user_lang(user)
+    await callback.message.edit_text("Notes section", reply_markup=get_notes_inline_menu(lang))
     await callback.answer()
 
 #ADD NOTE---------------------------------------------------------------------------------------
@@ -40,8 +42,10 @@ async def note_title(message: Message, state: FSMContext):
     await state.update_data(title=title)
     await state.set_state(AppState.add_note_date)
 
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="⏭️ Skip", callback_data="skip_note_date")]]
+        inline_keyboard=[[InlineKeyboardButton(text=get_label(lang, "skip"), callback_data="skip_note_date")]]
     )
     await message.answer("Enter date or press Skip", reply_markup=keyboard)
 
@@ -73,7 +77,8 @@ async def note_date(message: Message, state: FSMContext):
 
     await state.clear()
     await state.set_state(AppState.notes_menu)
-    await message.answer("Notes section", reply_markup=get_notes_inline_menu())
+    lang = get_user_lang(user)
+    await message.answer("Notes section", reply_markup=get_notes_inline_menu(lang))
 
 
 #LIST NOTES--------------------------------------------------------------------------------------
@@ -91,9 +96,11 @@ async def list_note_handler(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(AppState.notes_menu, F.data == "delete_note")
 async def delete_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.delete_note_number)
+    user = await get_current_user(callback)
+    lang = get_user_lang(user)
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="✖️ Cancel delete", callback_data="cancel_delete_note")]
+            [InlineKeyboardButton(text=get_label(lang, "cancel_delete"), callback_data="cancel_delete_note")]
         ]
     )
     await callback.message.edit_text("Enter number to delete:", reply_markup=keyboard)
@@ -159,12 +166,14 @@ async def cancel_delete_note(callback: CallbackQuery, state: FSMContext):
 
 
 async def render_notes_list(event, state, user_id: int):
+    user = await get_current_user(event)
+    lang = get_user_lang(user)
     notes = await get_notes(user_id)
     if not notes:
         if isinstance(event, CallbackQuery):
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="⬅️ Back", callback_data="menu:notes")]
+                    [InlineKeyboardButton(text=get_label(lang, "back"), callback_data="menu:notes")]
                 ]
             )
             await event.message.edit_text("list empty", reply_markup=keyboard)
@@ -186,8 +195,8 @@ async def render_notes_list(event, state, user_id: int):
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🗑️ Delete", callback_data="delete_note")],
-            [InlineKeyboardButton(text="⬅️ Back", callback_data="menu:notes")],
+            [InlineKeyboardButton(text=get_label(lang, "delete"), callback_data="delete_note")],
+            [InlineKeyboardButton(text=get_label(lang, "back"), callback_data="menu:notes")],
         ]
     )
 
@@ -222,7 +231,8 @@ async def skip_note_date(callback: CallbackQuery, state: FSMContext):
 
     await state.clear()
     await state.set_state(AppState.notes_menu)
-    await callback.message.edit_text("Notes section", reply_markup=get_notes_inline_menu())
+    lang = get_user_lang(user)
+    await callback.message.edit_text("Notes section", reply_markup=get_notes_inline_menu(lang))
 
 
 #BACK--------------------------------------------------------------------------------------

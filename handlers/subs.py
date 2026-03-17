@@ -7,8 +7,8 @@ import aiosqlite
 from dateutil.relativedelta import relativedelta
 from database import add_subscription, get_subscriptions, delete_subscription, DB_NAME
 from forms.app_states import AppState
-from handlers.auth import get_current_user
-from keyboards.menu import get_subs_inline_menu
+from handlers.auth import get_current_user, get_user_lang
+from keyboards.menu import get_subs_inline_menu, get_label
 from handlers.session import show_main_menu
 
 router = Router()
@@ -18,7 +18,9 @@ router = Router()
 @router.callback_query(F.data == "menu:subs")
 async def main_message(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.subs_menu)
-    await callback.message.edit_text("Subs Menu", reply_markup=get_subs_inline_menu())
+    user = await get_current_user(callback)
+    lang = get_user_lang(user)
+    await callback.message.edit_text("Subs Menu", reply_markup=get_subs_inline_menu(lang))
     await callback.answer()
 
 
@@ -80,8 +82,10 @@ async def subs_end_date(message: Message, state: FSMContext):
     await state.update_data(end_date=end_date)
     await state.set_state(AppState.add_subscription_comment)
 
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="⏭️ Skip", callback_data="skip_sub_comm")]]
+        inline_keyboard=[[InlineKeyboardButton(text=get_label(lang, "skip"), callback_data="skip_sub_comm")]]
     )
     await message.answer("Enter comment or Skip", reply_markup=keyboard)
 
@@ -111,7 +115,8 @@ async def subs_comment(message: Message, state: FSMContext):
 
     await state.clear()
     await state.set_state(AppState.subs_menu)
-    await message.answer("Subs menu", reply_markup=get_subs_inline_menu())
+    lang = get_user_lang(user)
+    await message.answer("Subs menu", reply_markup=get_subs_inline_menu(lang))
 
 
 #SKIP--------------------------------------------------------------------------------------
@@ -135,7 +140,8 @@ async def skip_subs_comment(callback: CallbackQuery, state: FSMContext):
 
     await state.clear()
     await state.set_state(AppState.subs_menu)
-    await callback.message.edit_text("Subs section", reply_markup=get_subs_inline_menu())
+    lang = get_user_lang(user)
+    await callback.message.edit_text("Subs section", reply_markup=get_subs_inline_menu(lang))
 
 
 #LIST--------------------------------------------------------------------------------------
@@ -153,9 +159,11 @@ async def list_note_handler(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(AppState.subs_menu, F.data == "extend_sub")
 async def extend_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.extend_subscription_number)
+    user = await get_current_user(callback)
+    lang = get_user_lang(user)
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="✖️ Cancel", callback_data="cancel_extend_sub")]
+            [InlineKeyboardButton(text=get_label(lang, "cancel"), callback_data="cancel_extend_sub")]
         ]
     )
     await callback.message.edit_text("Enter sub num", reply_markup=keyboard)
@@ -164,9 +172,11 @@ async def extend_start(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(AppState.subs_menu, F.data == "delete_sub")
 async def delete_sub_start_callback(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.delete_subscription_number)
+    user = await get_current_user(callback)
+    lang = get_user_lang(user)
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="✖️ Cancel delete", callback_data="cancel_delete_sub")]
+            [InlineKeyboardButton(text=get_label(lang, "cancel_delete"), callback_data="cancel_delete_sub")]
         ]
     )
     await callback.message.edit_text("Enter num", reply_markup=keyboard)
@@ -196,18 +206,20 @@ async def get_number(message: Message, state: FSMContext):
 
     await state.update_data(subscription_id=subscription_id)
 
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="1 month", callback_data="extend_1"),
-                InlineKeyboardButton(text="3 months", callback_data="extend_3"),
+                InlineKeyboardButton(text=get_label(lang, "one_month"), callback_data="extend_1"),
+                InlineKeyboardButton(text=get_label(lang, "three_months"), callback_data="extend_3"),
             ],
             [
-                InlineKeyboardButton(text="6 months", callback_data="extend_6"),
-                InlineKeyboardButton(text="…", callback_data="extend_other"),
+                InlineKeyboardButton(text=get_label(lang, "six_months"), callback_data="extend_6"),
+                InlineKeyboardButton(text=get_label(lang, "other"), callback_data="extend_other"),
             ],
             [
-                InlineKeyboardButton(text="⬅️ Back", callback_data="back_list_number"),
+                InlineKeyboardButton(text=get_label(lang, "back"), callback_data="back_list_number"),
             ]
         ]
     )
@@ -247,7 +259,9 @@ async def process_extension(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
         return
 
-    await callback.message.answer("Subscription extended", reply_markup=get_subs_inline_menu())
+    user = await get_current_user(callback)
+    lang = get_user_lang(user)
+    await callback.message.answer("Subscription extended", reply_markup=get_subs_inline_menu(lang))
     await state.set_state(AppState.subs_menu)
     await callback.answer()
 
@@ -304,7 +318,9 @@ async def process_custom_months(message: Message, state: FSMContext):
 
     await extend_subscription_date(subscription_id, months)
 
-    await message.answer("Subscription extended", reply_markup=get_subs_inline_menu())
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
+    await message.answer("Subscription extended", reply_markup=get_subs_inline_menu(lang))
     await state.set_state(AppState.subs_menu)
 
 
@@ -388,12 +404,14 @@ async def cancel_extend_sub(callback: CallbackQuery, state: FSMContext):
 
 
 async def render_subs_list(event, state, user_id: int):
+    user = await get_current_user(event)
+    lang = get_user_lang(user)
     subs = await get_subscriptions(user_id)
     if not subs:
         if isinstance(event, CallbackQuery):
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="⬅️ Back", callback_data="menu:subs")]
+                    [InlineKeyboardButton(text=get_label(lang, "back"), callback_data="menu:subs")]
                 ]
             )
             await event.message.edit_text("list empty", reply_markup=keyboard)
@@ -415,9 +433,9 @@ async def render_subs_list(event, state, user_id: int):
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="⏳ Extend", callback_data="extend_sub")],
-            [InlineKeyboardButton(text="🗑️ Delete", callback_data="delete_sub")],
-            [InlineKeyboardButton(text="⬅️ Back", callback_data="menu:subs")],
+            [InlineKeyboardButton(text=get_label(lang, "extend"), callback_data="extend_sub")],
+            [InlineKeyboardButton(text=get_label(lang, "delete"), callback_data="delete_sub")],
+            [InlineKeyboardButton(text=get_label(lang, "back"), callback_data="menu:subs")],
         ]
     )
 

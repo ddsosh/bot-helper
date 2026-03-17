@@ -19,3 +19,9 @@ async def start(message: Message, state: FSMContext):
 
 async def get_current_user(event):
     return await ensure_user(event.from_user.id)
+
+
+def get_user_lang(user):
+    if not user or len(user) < 3:
+        return "ru"
+    return user[2] or "ru"

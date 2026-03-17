@@ -13,9 +13,14 @@ async def init_db():
         await db.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            telegram_id INTEGER UNIQUE NOT NULL
+            telegram_id INTEGER UNIQUE NOT NULL,
+            lang TEXT NOT NULL DEFAULT 'ru'
             )
         """)
+        cursor = await db.execute("PRAGMA table_info(users)")
+        columns = [row[1] for row in await cursor.fetchall()]
+        if "lang" not in columns:
+            await db.execute("ALTER TABLE users ADD COLUMN lang TEXT NOT NULL DEFAULT 'ru'")
         await db.execute("""
         CREATE TABLE IF NOT EXISTS movies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,6 +118,17 @@ async def get_user_by_id(user_id):
                     SELECT * FROM users WHERE id = ?
                 """, (user_id,))
         return await cursor.fetchone()
+
+
+async def set_user_lang(telegram_id, lang):
+    if lang not in {"ru", "en"}:
+        return False
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("""
+            UPDATE users SET lang = ? WHERE telegram_id = ?
+        """, (lang, telegram_id))
+        await db.commit()
+        return True
 
 
 #MOVIE------------------------------------------------------------------------------------
