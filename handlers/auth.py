@@ -4,14 +4,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from database import ensure_user
-from forms.app_states import AppState
-from handlers.session import show_main_menu
 
 router = Router()
 
 #START-------------------------------------------------------------------------------------
 @router.message(Command("start"))
 async def start(message: Message, state: FSMContext):
+    from handlers.session import show_main_menu
+
     await ensure_user(message.from_user.id)
     await show_main_menu(message, state)
 
