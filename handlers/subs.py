@@ -1,10 +1,11 @@
-from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
-from aiogram.fsm.context import FSMContext
 from datetime import datetime
 
 import aiosqlite
+from aiogram import Router, F
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
+from aiogram.fsm.context import FSMContext
 from dateutil.relativedelta import relativedelta
+
 from database import add_subscription, get_subscriptions, delete_subscription, DB_NAME
 from forms.app_states import AppState
 from handlers.auth import get_current_user, get_user_lang
@@ -13,81 +14,86 @@ from handlers.session import show_main_menu
 
 router = Router()
 
-#MENU--------------------------------------------------------------------------------------
 
 @router.callback_query(F.data == "menu:subs")
 async def main_message(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.subs_menu)
     user = await get_current_user(callback)
     lang = get_user_lang(user)
-    await callback.message.edit_text("Subs Menu", reply_markup=get_subs_inline_menu(lang))
+    await callback.message.edit_text(get_label(lang, "subs_section"), reply_markup=get_subs_inline_menu(lang))
     await callback.answer()
 
 
-
-#ADD SUB---------------------------------------------------------------------------------------
 @router.callback_query(AppState.subs_menu, F.data == "subs:add")
 async def main_menu(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.add_subscription_title)
-    await callback.message.edit_text("name")
+    user = await get_current_user(callback)
+    await callback.message.edit_text(get_label(get_user_lang(user), "enter_title"))
     await callback.answer()
+
 
 @router.message(AppState.add_subscription_title)
 async def subs_title(message: Message, state: FSMContext):
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
     title = (message.text or "").strip()
 
     if not title:
-        await message.answer("Title cannot be empty")
+        await message.answer(get_label(lang, "title_empty"))
         return
 
     if len(title) > 50:
-        await message.answer("Title is too long (max 50)")
+        await message.answer(get_label(lang, "title_too_long"))
         return
 
     await state.update_data(title=title)
     await state.set_state(AppState.add_subscription_price)
-    await message.answer("price", reply_markup=ReplyKeyboardRemove())
+    await message.answer(get_label(lang, "enter_price"), reply_markup=ReplyKeyboardRemove())
+
 
 @router.message(AppState.add_subscription_price)
 async def subs_price(message: Message, state: FSMContext):
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
     text = (message.text or "").strip()
 
     if not text:
-        await message.answer("Price cannot be empty")
+        await message.answer(get_label(lang, "price_empty"))
         return
     try:
         price = int(text)
     except ValueError:
-        await message.answer("Invalid price")
+        await message.answer(get_label(lang, "invalid_price"))
         return
 
     await state.update_data(price=price)
     await state.set_state(AppState.add_subscription_end_date)
-    await message.answer("end date YYYY-MM-DD", reply_markup=ReplyKeyboardRemove())
+    await message.answer(get_label(lang, "enter_end_date"), reply_markup=ReplyKeyboardRemove())
+
 
 @router.message(AppState.add_subscription_end_date)
 async def subs_end_date(message: Message, state: FSMContext):
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
     end_date = (message.text or "").strip()
 
     if not end_date:
-        await message.answer("End date cannot be empty")
+        await message.answer(get_label(lang, "end_date_empty"))
         return
 
     try:
         datetime.strptime(end_date, "%Y-%m-%d")
     except ValueError:
-        await message.answer("Wrong date format. Use YYYY-MM-DD")
+        await message.answer(get_label(lang, "wrong_date_format"))
         return
 
     await state.update_data(end_date=end_date)
     await state.set_state(AppState.add_subscription_comment)
 
-    user = await get_current_user(message)
-    lang = get_user_lang(user)
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text=get_label(lang, "skip"), callback_data="skip_sub_comm")]]
     )
-    await message.answer("Enter comment or Skip", reply_markup=keyboard)
+    await message.answer(get_label(lang, "enter_comment_or_skip"), reply_markup=keyboard)
 
 
 @router.message(AppState.add_subscription_comment)
@@ -96,30 +102,28 @@ async def subs_comment(message: Message, state: FSMContext):
     title = data.get("title")
     price = data.get("price")
     end_date = data.get("end_date")
-
     comment = (message.text or "").strip()
 
-    if len(comment) > 500:
-        await message.answer("Comment is too long (max 500)")
-        return
-
     user = await get_current_user(message)
+    lang = get_user_lang(user)
+
+    if len(comment) > 500:
+        await message.answer(get_label(lang, "comment_too_long"))
+        return
 
     if not user:
         await state.set_state(AppState.main)
-        await message.answer("error(user not found) /start")
+        await message.answer(get_label("ru", "user_not_found_error"))
         return
 
     await add_subscription(user[0], title, price, end_date, comment)
-    await message.answer("OK")
+    await message.answer(get_label(lang, "ok"))
 
     await state.clear()
     await state.set_state(AppState.subs_menu)
-    lang = get_user_lang(user)
-    await message.answer("Subs menu", reply_markup=get_subs_inline_menu(lang))
+    await message.answer(get_label(lang, "subs_section"), reply_markup=get_subs_inline_menu(lang))
 
 
-#SKIP--------------------------------------------------------------------------------------
 @router.callback_query(AppState.add_subscription_comment, F.data == "skip_sub_comm")
 async def skip_subs_comment(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -128,34 +132,32 @@ async def skip_subs_comment(callback: CallbackQuery, state: FSMContext):
     end_date = data.get("end_date")
 
     user = await get_current_user(callback)
+    lang = get_user_lang(user)
 
     if not user:
         await state.set_state(AppState.main)
-        await callback.message.answer("error(user not found) /start")
+        await callback.message.answer(get_label("ru", "user_not_found_error"))
         await callback.answer()
         return
 
-    await add_subscription(user[0], title,  price, end_date,  None)
+    await add_subscription(user[0], title, price, end_date, None)
     await callback.answer()
 
     await state.clear()
     await state.set_state(AppState.subs_menu)
-    lang = get_user_lang(user)
-    await callback.message.edit_text("Subs section", reply_markup=get_subs_inline_menu(lang))
+    await callback.message.edit_text(get_label(lang, "subs_section"), reply_markup=get_subs_inline_menu(lang))
 
 
-#LIST--------------------------------------------------------------------------------------
 @router.callback_query(AppState.subs_menu, F.data == "subs:list")
 async def list_note_handler(callback: CallbackQuery, state: FSMContext):
     user = await get_current_user(callback)
     if not user:
-        await callback.answer("error(list) /start")
+        await callback.answer(get_label("ru", "user_not_found_error"))
         return
     await render_subs_list(callback, state, user[0])
     await callback.answer()
 
 
-#EXTEND------------------------------------------------------------------------------------
 @router.callback_query(AppState.subs_menu, F.data == "extend_sub")
 async def extend_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.extend_subscription_number)
@@ -166,8 +168,9 @@ async def extend_start(callback: CallbackQuery, state: FSMContext):
             [InlineKeyboardButton(text=get_label(lang, "cancel"), callback_data="cancel_extend_sub")]
         ]
     )
-    await callback.message.edit_text("Enter sub num", reply_markup=keyboard)
+    await callback.message.edit_text(get_label(lang, "enter_sub_number"), reply_markup=keyboard)
     await callback.answer()
+
 
 @router.callback_query(AppState.subs_menu, F.data == "delete_sub")
 async def delete_sub_start_callback(callback: CallbackQuery, state: FSMContext):
@@ -179,35 +182,35 @@ async def delete_sub_start_callback(callback: CallbackQuery, state: FSMContext):
             [InlineKeyboardButton(text=get_label(lang, "cancel_delete"), callback_data="cancel_delete_sub")]
         ]
     )
-    await callback.message.edit_text("Enter num", reply_markup=keyboard)
+    await callback.message.edit_text(get_label(lang, "enter_number"), reply_markup=keyboard)
     await callback.answer()
+
 
 @router.message(AppState.extend_subscription_number)
 async def get_number(message: Message, state: FSMContext):
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
     data = await state.get_data()
     sub_map = data.get("sub_map")
 
     if not sub_map:
-        await message.answer("First use 'list subs'")
+        await message.answer(get_label(lang, "first_use_list_subs"))
         await state.set_state(AppState.subs_menu)
         return
 
     if not message.text.isdigit():
-        await message.answer("Enter valid number")
+        await message.answer(get_label(lang, "enter_valid_number"))
         return
 
     number = int(message.text)
 
     if number not in sub_map:
-        await message.answer("Invalid number")
+        await message.answer(get_label(lang, "invalid_number"))
         return
 
     subscription_id = sub_map[number]
-
     await state.update_data(subscription_id=subscription_id)
 
-    user = await get_current_user(message)
-    lang = get_user_lang(user)
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -220,18 +223,20 @@ async def get_number(message: Message, state: FSMContext):
             ],
             [
                 InlineKeyboardButton(text=get_label(lang, "back"), callback_data="back_list_number"),
-            ]
+            ],
         ]
     )
 
     await state.set_state(AppState.extend_subscription_period)
-    await message.answer("Choose period:", reply_markup=keyboard)
+    await message.answer(get_label(lang, "choose_period"), reply_markup=keyboard)
+
 
 @router.callback_query(AppState.extend_subscription_period, F.data.startswith("extend_"))
 async def process_extension(callback: CallbackQuery, state: FSMContext):
-
     data = await state.get_data()
     subscription_id = data.get("subscription_id")
+    user = await get_current_user(callback)
+    lang = get_user_lang(user)
 
     months_map = {
         "extend_1": 1,
@@ -241,36 +246,35 @@ async def process_extension(callback: CallbackQuery, state: FSMContext):
 
     if callback.data == "extend_other":
         await state.set_state(AppState.extend_custom_months)
-        await callback.message.answer("Enter number of months:", reply_markup=ReplyKeyboardRemove())
+        await callback.message.answer(get_label(lang, "enter_months_number"), reply_markup=ReplyKeyboardRemove())
         await callback.answer()
         return
 
     months = months_map.get(callback.data)
-
     if months is None:
         await callback.answer()
         return
 
     success = await extend_subscription_date(subscription_id, months)
-
     if not success:
-        await callback.message.answer("Subscription not found")
+        await callback.message.answer(get_label(lang, "subscription_not_found"))
         await state.set_state(AppState.subs_menu)
         await callback.answer()
         return
 
-    user = await get_current_user(callback)
-    lang = get_user_lang(user)
-    await callback.message.answer("Subscription extended", reply_markup=get_subs_inline_menu(lang))
+    await callback.message.answer(get_label(lang, "subscription_extended"), reply_markup=get_subs_inline_menu(lang))
     await state.set_state(AppState.subs_menu)
     await callback.answer()
 
+
 async def extend_subscription_date(subscription_id, months):
     async with aiosqlite.connect(DB_NAME) as db:
-
-        cursor = await db.execute("""
+        cursor = await db.execute(
+            """
             SELECT end_date FROM subscriptions WHERE id = ?
-        """, (subscription_id,))
+            """,
+            (subscription_id,),
+        )
 
         result = await cursor.fetchone()
 
@@ -287,91 +291,92 @@ async def extend_subscription_date(subscription_id, months):
 
         new_date = base_date + relativedelta(months=months)
 
-        await db.execute("""
+        await db.execute(
+            """
             UPDATE subscriptions
             SET end_date = ?, 
                 reminded_5_days = 0,
                 reminded_1_day = 0
             WHERE id = ?
-        """, (new_date.strftime("%Y-%m-%d"), subscription_id))
+            """,
+            (new_date.strftime("%Y-%m-%d"), subscription_id),
+        )
 
         await db.commit()
-
         return True
+
 
 @router.message(AppState.extend_custom_months)
 async def process_custom_months(message: Message, state: FSMContext):
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
 
     if not message.text.isdigit():
-        await message.answer("Enter valid number")
+        await message.answer(get_label(lang, "enter_valid_number"))
         return
 
     months = int(message.text)
-
     data = await state.get_data()
     subscription_id = data.get("subscription_id")
 
     if not subscription_id:
-        await message.answer("Error. Start again")
+        await message.answer(get_label(lang, "error_start_again"))
         await state.set_state(AppState.subs_menu)
         return
 
     await extend_subscription_date(subscription_id, months)
-
-    user = await get_current_user(message)
-    lang = get_user_lang(user)
-    await message.answer("Subscription extended", reply_markup=get_subs_inline_menu(lang))
+    await message.answer(get_label(lang, "subscription_extended"), reply_markup=get_subs_inline_menu(lang))
     await state.set_state(AppState.subs_menu)
 
 
-@router.callback_query(AppState.extend_subscription_period,F.data == "back_list_number")
+@router.callback_query(AppState.extend_subscription_period, F.data == "back_list_number")
 async def back_list_number(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.extend_subscription_number)
-    await callback.message.answer("Enter sub num")
+    user = await get_current_user(callback)
+    await callback.message.answer(get_label(get_user_lang(user), "enter_sub_number"))
     await callback.answer()
 
 
-#DELETE------------------------------------------------------------------------------------
-
 @router.message(AppState.delete_subscription_number)
 async def delete_sub_by_number(message: Message, state: FSMContext):
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
     data = await state.get_data()
     sub_map = data.get("sub_map")
 
     if not sub_map:
-        await message.answer("First use 'list subs'")
+        await message.answer(get_label(lang, "first_use_list_subs"))
         await state.set_state(AppState.subs_menu)
         return
 
     try:
         number = int(message.text)
     except (TypeError, ValueError):
-        await message.answer("Enter a valid number")
+        await message.answer(get_label(lang, "enter_valid_number"))
         return
 
     if number not in sub_map:
-        await message.answer("No sub with that number")
+        await message.answer(get_label(lang, "no_sub_with_number"))
+        return
+
+    if not user:
+        await state.set_state(AppState.main)
+        await message.answer(get_label("ru", "user_not_found_error"))
         return
 
     sub_id = sub_map[number]
-    user = await get_current_user(message)
-    if not user:
-        await state.set_state(AppState.main)
-        await message.answer("error(user not found) /start")
-        return
-
     await delete_subscription(user[0], sub_id)
     await state.set_state(AppState.subs_menu)
     await render_subs_list(message, state, user[0])
 
-#DEL SUB CB---------------------------------------------------------------------------------
+
 @router.callback_query(F.data.startswith("del_sub_"))
 async def delete_callback(callback: CallbackQuery, state: FSMContext):
     sub_id = int(callback.data.split("_")[2])
     user = await get_current_user(callback)
 
     if not user:
-        await callback.answer("error(user not found) /start")
+        await callback.answer(get_label("ru", "user_not_found_error"))
         return
 
     await delete_subscription(user[0], sub_id)
@@ -383,7 +388,7 @@ async def delete_callback(callback: CallbackQuery, state: FSMContext):
 async def cancel_delete_sub(callback: CallbackQuery, state: FSMContext):
     user = await get_current_user(callback)
     if not user:
-        await callback.answer("error(user not found) /start")
+        await callback.answer(get_label("ru", "user_not_found_error"))
         return
 
     await state.set_state(AppState.subs_menu)
@@ -395,7 +400,7 @@ async def cancel_delete_sub(callback: CallbackQuery, state: FSMContext):
 async def cancel_extend_sub(callback: CallbackQuery, state: FSMContext):
     user = await get_current_user(callback)
     if not user:
-        await callback.answer("error(user not found) /start")
+        await callback.answer(get_label("ru", "user_not_found_error"))
         return
 
     await state.set_state(AppState.subs_menu)
@@ -408,23 +413,26 @@ async def render_subs_list(event, state, user_id: int):
     lang = get_user_lang(user)
     subs = await get_subscriptions(user_id)
     if not subs:
+        if state:
+            await state.update_data(sub_map={})
+            await state.set_state(AppState.subs_menu)
+
         if isinstance(event, CallbackQuery):
-            keyboard = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text=get_label(lang, "back"), callback_data="menu:subs")]
-                ]
-            )
-            await event.message.edit_text("list empty", reply_markup=keyboard)
+            await event.message.edit_text(get_label(lang, "subs_section"), reply_markup=get_subs_inline_menu(lang))
         else:
-            await event.answer("list empty")
+            await event.answer(get_label(lang, "subs_section"), reply_markup=get_subs_inline_menu(lang))
         return
 
-    text = "Subs:\n"
+    text = get_label(lang, "subs_list_title")
     sub_map = {}
 
     for index, sub in enumerate(subs, start=1):
-        sub_id, user_id, title, price, end_date, reminded_5_days, reminded_1_day, comment = sub[:8]
-        comment_text = comment if comment else "No comment"
+        sub_id = sub[0]
+        title = sub[2]
+        price = sub[3]
+        end_date = sub[4]
+        comment = sub[7]
+        comment_text = comment or ""
         text += f"{index}. {title}, {price}, {end_date} - {comment_text}\n"
         sub_map[index] = sub_id
 
@@ -445,7 +453,6 @@ async def render_subs_list(event, state, user_id: int):
         await event.answer(text, reply_markup=keyboard)
 
 
-#BACK--------------------------------------------------------------------------------------
 @router.callback_query(AppState.subs_menu, F.data == "menu:main")
 async def back_handler(callback: CallbackQuery, state: FSMContext):
     await show_main_menu(callback, state)

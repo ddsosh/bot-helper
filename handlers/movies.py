@@ -11,51 +11,54 @@ from handlers.session import show_main_menu
 
 router = Router()
 
-# MENU--------------------------------------------------------------------------------------
-
 
 @router.callback_query(F.data == "menu:movies")
 async def movies_menu(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.movies_menu)
     user = await get_current_user(callback)
     lang = get_user_lang(user)
-    await callback.message.edit_text("Movies section", reply_markup=get_movies_inline_menu(lang))
+    await callback.message.edit_text(get_label(lang, "movies_section"), reply_markup=get_movies_inline_menu(lang))
     await callback.answer()
 
 
 @router.callback_query(AppState.movies_menu, F.data == "movies:add")
 async def add_movie_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.add_movie_title)
-    await callback.message.edit_text("Enter name")
+    user = await get_current_user(callback)
+    await callback.message.edit_text(get_label(get_user_lang(user), "enter_title"))
     await callback.answer()
 
 
-#ADD MOVIE---------------------------------------------------------------------------------------
 @router.message(AppState.add_movie_title)
 async def movie_title(message: Message, state: FSMContext):
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
     title = (message.text or "").strip()
+
     if not title:
-        await message.answer("Title cannot be empty")
+        await message.answer(get_label(lang, "title_empty"))
         return
     if len(title) > 50:
-        await message.answer("Title is too long (max 50)")
+        await message.answer(get_label(lang, "title_too_long"))
         return
 
     await state.update_data(title=title)
     await state.set_state(AppState.add_movie_type)
-    await message.answer("M | S", reply_markup=ReplyKeyboardRemove())
+    await message.answer(get_label(lang, "enter_type"), reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(AppState.add_movie_type)
 async def movie_type(message: Message, state: FSMContext):
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
     type_ = (message.text or "").strip().upper()
     if type_ not in {"M", "S"}:
-        await message.answer("Type must be 'M' or 'S'")
+        await message.answer(get_label(lang, "type_invalid"))
         return
 
     await state.update_data(type_=type_)
     await state.set_state(AppState.add_movie_comment)
-    await message.answer("comment:", reply_markup=ReplyKeyboardRemove())
+    await message.answer(get_label(lang, "enter_comment"), reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(AppState.add_movie_comment)
@@ -63,40 +66,38 @@ async def movie_comment(message: Message, state: FSMContext):
     data = await state.get_data()
     title = data["title"]
     type_ = data["type_"]
-
     comment = (message.text or "").strip()
 
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
+
     if len(comment) > 500:
-        await message.answer("Comment is too long (max 500)")
+        await message.answer(get_label(lang, "comment_too_long"))
         return
 
-    user = await get_current_user(message)
     if not user:
         await state.set_state(AppState.main)
-        await message.answer("error(user not found) /start")
+        await message.answer(get_label("ru", "user_not_found_error"))
         return
 
     await add_movie(user[0], title, type_, comment)
-    await message.answer("OK")
+    await message.answer(get_label(lang, "ok"))
 
     await state.clear()
     await state.set_state(AppState.movies_menu)
-    lang = get_user_lang(user)
-    await message.answer("Movies section", reply_markup=get_movies_inline_menu(lang))
+    await message.answer(get_label(lang, "movies_section"), reply_markup=get_movies_inline_menu(lang))
 
 
-#LIST MOVIE--------------------------------------------------------------------------------------
 @router.callback_query(AppState.movies_menu, F.data == "movies:list")
 async def list_movies_handler(callback: CallbackQuery, state: FSMContext):
     user = await get_current_user(callback)
     if not user:
-        await callback.answer("error(list) /start")
+        await callback.answer(get_label("ru", "user_not_found_error"))
         return
     await render_movies_list(callback, state, user[0])
     await callback.answer()
 
 
-#DELETE MOVIE------------------------------------------------------------------------------------
 @router.callback_query(AppState.movies_menu, F.data == "delete_movie")
 async def delete_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AppState.delete_movie_number)
@@ -107,56 +108,55 @@ async def delete_start(callback: CallbackQuery, state: FSMContext):
             [InlineKeyboardButton(text=get_label(lang, "cancel_delete"), callback_data="cancel_delete_movie")]
         ]
     )
-    await callback.message.answer("Enter number to delete:", reply_markup=keyboard)
+    await callback.message.answer(get_label(lang, "enter_number_to_delete"), reply_markup=keyboard)
     await callback.answer()
 
 
 @router.message(AppState.delete_movie_number)
 async def delete_by_number(message: Message, state: FSMContext):
+    user = await get_current_user(message)
+    lang = get_user_lang(user)
     data = await state.get_data()
     movie_map = data.get("movie_map")
 
     if not movie_map:
-        await message.answer("First use 'list movies'")
+        await message.answer(get_label(lang, "first_use_list_movies"))
         await state.set_state(AppState.movies_menu)
         return
 
     try:
         number = int(message.text)
     except (TypeError, ValueError):
-        await message.answer("Enter a valid number")
+        await message.answer(get_label(lang, "enter_valid_number"))
         return
 
     if number not in movie_map:
-        await message.answer("No movie with that number")
+        await message.answer(get_label(lang, "no_movie_with_number"))
+        return
+
+    if not user:
+        await state.set_state(AppState.main)
+        await message.answer(get_label("ru", "user_not_found_error"))
         return
 
     movie_id = movie_map[number]
-    user = await get_current_user(message)
-    if not user:
-        await state.set_state(AppState.main)
-        await message.answer("error(user not found) /start")
-        return
-
     await delete_movie(user[0], movie_id)
     await state.set_state(AppState.movies_menu)
     await render_movies_list(message, state, user[0])
 
 
-#BACK--------------------------------------------------------------------------------------
 @router.callback_query(AppState.movies_menu, F.data == "menu:main")
 async def back_handler(callback: CallbackQuery, state: FSMContext):
     await show_main_menu(callback, state)
     await callback.answer()
 
 
-#DEL MOVIE CB---------------------------------------------------------------------------------
 @router.callback_query(F.data.startswith("del_movie_"))
 async def delete_callback(callback: CallbackQuery, state: FSMContext):
     movie_id = int(callback.data.split("_")[2])
     user = await get_current_user(callback)
     if not user:
-        await callback.answer("error(user not found) /start")
+        await callback.answer(get_label("ru", "user_not_found_error"))
         return
 
     await delete_movie(user[0], movie_id)
@@ -168,7 +168,7 @@ async def delete_callback(callback: CallbackQuery, state: FSMContext):
 async def cancel_delete_movie(callback: CallbackQuery, state: FSMContext):
     user = await get_current_user(callback)
     if not user:
-        await callback.answer("error(user not found) /start")
+        await callback.answer(get_label("ru", "user_not_found_error"))
         return
 
     await state.set_state(AppState.movies_menu)
@@ -181,23 +181,26 @@ async def render_movies_list(event, state, user_id: int):
     lang = get_user_lang(user)
     movies = await get_movies(user_id)
     if not movies:
+        if state:
+            await state.update_data(movie_map={})
+            await state.set_state(AppState.movies_menu)
+
         if isinstance(event, CallbackQuery):
-            keyboard = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text=get_label(lang, "back"), callback_data="menu:movies")]
-                ]
-            )
-            await event.message.edit_text("list empty", reply_markup=keyboard)
+            await event.message.edit_text(get_label(lang, "movies_section"), reply_markup=get_movies_inline_menu(lang))
         else:
-            await event.answer("list empty")
+            await event.answer(get_label(lang, "movies_section"), reply_markup=get_movies_inline_menu(lang))
         return
 
-    text = "Movies list:\n\n"
+    text = get_label(lang, "movies_list_title")
     movie_map = {}
 
     for index, movie in enumerate(movies, start=1):
-        movie_id, user_id, title, type_, comment, created_at = movie
-        text += f"{index}. {title} ({type_}) - {comment}\n"
+        movie_id = movie[0]
+        title = movie[2]
+        type_ = movie[3]
+        comment = movie[4]
+        comment_text = comment or ""
+        text += f"{index}. {title} ({type_}) - {comment_text}\n"
         movie_map[index] = movie_id
 
     if state:
