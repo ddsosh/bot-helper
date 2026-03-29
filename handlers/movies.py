@@ -66,7 +66,12 @@ async def movie_type(callback: CallbackQuery, state: FSMContext):
 
     await state.update_data(type_=type_)
     await state.set_state(AppState.add_movie_comment)
-    await callback.message.edit_text(get_label(lang, "enter_comment"))
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=get_label(lang, "skip"), callback_data="skip_movie_comment")]
+        ]
+    )
+    await callback.message.edit_text(get_label(lang, "enter_comment_or_skip"), reply_markup=keyboard)
     await callback.answer()
 
 
@@ -95,6 +100,29 @@ async def movie_comment(message: Message, state: FSMContext):
     await state.clear()
     await state.set_state(AppState.movies_menu)
     await message.answer(get_label(lang, "movies_section"), reply_markup=get_movies_inline_menu(lang))
+
+
+@router.callback_query(AppState.add_movie_comment, F.data == "skip_movie_comment")
+async def skip_movie_comment(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    title = data.get("title")
+    type_ = data.get("type_")
+
+    user = await get_current_user(callback)
+    lang = get_user_lang(user)
+
+    if not user:
+        await state.set_state(AppState.main)
+        await callback.message.answer(get_label("ru", "user_not_found_error"))
+        await callback.answer()
+        return
+
+    await add_movie(user[0], title, type_, "")
+    await callback.answer()
+
+    await state.clear()
+    await state.set_state(AppState.movies_menu)
+    await callback.message.edit_text(get_label(lang, "movies_section"), reply_markup=get_movies_inline_menu(lang))
 
 
 @router.callback_query(AppState.movies_menu, F.data == "movies:list")
