@@ -187,7 +187,7 @@ async def render_notes_list(event, state, user_id: int):
         title = note[2]
         due_date = note[3]
         date_text = due_date if due_date else get_label(lang, "no_date")
-        text += f"{index}. {title} - {date_text}\n"
+        text += f"{index}. {title}\n{date_text}\n\n"
         note_map[index] = note_id
 
     if state:

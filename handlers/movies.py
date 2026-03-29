@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 
 from keyboards.menu import get_movies_inline_menu, get_label
@@ -44,21 +44,30 @@ async def movie_title(message: Message, state: FSMContext):
 
     await state.update_data(title=title)
     await state.set_state(AppState.add_movie_type)
-    await message.answer(get_label(lang, "enter_type"), reply_markup=ReplyKeyboardRemove())
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=get_label(lang, "movie_type_movie"), callback_data="movie_type:M"),
+                InlineKeyboardButton(text=get_label(lang, "movie_type_series"), callback_data="movie_type:S"),
+            ]
+        ]
+    )
+    await message.answer(get_label(lang, "choose_movie_type"), reply_markup=keyboard)
 
 
-@router.message(AppState.add_movie_type)
-async def movie_type(message: Message, state: FSMContext):
-    user = await get_current_user(message)
+@router.callback_query(AppState.add_movie_type, F.data.startswith("movie_type:"))
+async def movie_type(callback: CallbackQuery, state: FSMContext):
+    user = await get_current_user(callback)
     lang = get_user_lang(user)
-    type_ = (message.text or "").strip().upper()
+    type_ = callback.data.split(":", 1)[1]
     if type_ not in {"M", "S"}:
-        await message.answer(get_label(lang, "type_invalid"))
+        await callback.answer()
         return
 
     await state.update_data(type_=type_)
     await state.set_state(AppState.add_movie_comment)
-    await message.answer(get_label(lang, "enter_comment"), reply_markup=ReplyKeyboardRemove())
+    await callback.message.edit_text(get_label(lang, "enter_comment"))
+    await callback.answer()
 
 
 @router.message(AppState.add_movie_comment)
